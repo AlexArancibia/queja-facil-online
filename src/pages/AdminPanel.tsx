@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complaint';
 import AddManagerForm from '@/components/AddManagerForm';
@@ -29,7 +30,8 @@ import {
   Building2,
   Shield,
   PieChart,
-  Activity
+  Activity,
+  Search
 } from 'lucide-react';
 
 const AdminPanel = () => {
@@ -40,6 +42,8 @@ const AdminPanel = () => {
   const [managers, setManagers] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -95,6 +99,14 @@ const AdminPanel = () => {
   const filteredComplaints = complaints.filter(complaint => {
     if (filterStatus !== 'all' && complaint.status !== filterStatus) return false;
     if (filterStore !== 'all' && complaint.store !== filterStore) return false;
+    
+    // Date range filtering
+    if (startDate || endDate) {
+      const complaintDate = new Date(complaint.createdAt);
+      if (startDate && complaintDate < new Date(startDate)) return false;
+      if (endDate && complaintDate > new Date(endDate + 'T23:59:59')) return false;
+    }
+    
     return true;
   });
 
@@ -112,11 +124,11 @@ const AdminPanel = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-siclo-light/50">
+      <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-siclo-light/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
+          <div className="flex flex-col lg:flex-row justify-between items-center h-auto lg:h-16 py-4 lg:py-0">
+            <div className="flex items-center space-x-4 mb-4 lg:mb-0">
+              <div className="w-12 h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-sm">
                 <Shield className="h-7 w-7 text-white" />
               </div>
               <div>
@@ -124,6 +136,29 @@ const AdminPanel = () => {
                 <p className="text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
               </div>
             </div>
+            
+            {/* Date Range Filter */}
+            <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-4 lg:mb-0">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-siclo-blue" />
+                <Label className="text-sm text-siclo-dark font-medium">Filtro por fecha:</Label>
+              </div>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-auto border-siclo-light"
+                placeholder="Desde"
+              />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-auto border-siclo-light"
+                placeholder="Hasta"
+              />
+            </div>
+            
             <Button 
               variant="outline" 
               onClick={logout} 
@@ -137,15 +172,11 @@ const AdminPanel = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-white/80 backdrop-blur-sm shadow-sm border border-siclo-light/50 h-14">
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <BarChart3 className="h-4 w-4 mr-2" />
-              Resumen
-            </TabsTrigger>
-            <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <MessageSquareText className="h-4 w-4 mr-2" />
-              Quejas
+              Dashboard
             </TabsTrigger>
             <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Users className="h-4 w-4 mr-2" />
@@ -161,59 +192,59 @@ const AdminPanel = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="dashboard" className="space-y-6">
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
+              <Card className="siclo-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Total Quejas</p>
                       <p className="text-3xl font-bold text-siclo-dark">{quickStats.total}</p>
                     </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-xl flex items-center justify-center shadow-sm">
                       <MessageSquareText className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
+              <Card className="siclo-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Managers</p>
                       <p className="text-3xl font-bold text-siclo-dark">{quickStats.totalManagers}</p>
                     </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm">
                       <Users className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
+              <Card className="siclo-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Resueltas</p>
                       <p className="text-3xl font-bold text-emerald-600">{quickStats.resolved}</p>
                     </div>
-                    <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-sm">
                       <CheckCircle className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
+              <Card className="siclo-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Pendientes</p>
                       <p className="text-3xl font-bold text-amber-600">{quickStats.pending}</p>
                     </div>
-                    <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-sm">
                       <Clock className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -221,46 +252,16 @@ const AdminPanel = () => {
               </Card>
             </div>
 
-            {/* Recent Activity Summary */}
-            <Card className="siclo-card">
-              <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
-                <CardTitle className="text-siclo-dark flex items-center">
-                  <Activity className="h-5 w-5 mr-2" />
-                  Resumen de Actividad
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-siclo-blue">{MOCK_STORES.length}</p>
-                    <p className="text-sm text-siclo-dark/70">Locales Activos</p>
-                  </div>
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-siclo-green">{quickStats.totalManagers}</p>
-                    <p className="text-sm text-siclo-dark/70">Managers Registrados</p>
-                  </div>
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-amber-600">
-                      {quickStats.total > 0 ? ((quickStats.resolved / quickStats.total) * 100).toFixed(1) : 0}%
-                    </p>
-                    <p className="text-sm text-siclo-dark/70">Tasa de Resolución</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="complaints" className="space-y-6">
             {/* Filters */}
             <Card className="siclo-card">
               <CardHeader>
                 <CardTitle className="flex items-center text-siclo-dark">
                   <Filter className="h-5 w-5 mr-2" />
-                  Filtros
+                  Filtros de Quejas
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
                   <div>
                     <Label className="text-siclo-dark font-medium">Estado</Label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -306,10 +307,10 @@ const AdminPanel = () => {
               <CardContent>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {filteredComplaints.map((complaint) => (
-                    <Card key={complaint.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
+                    <Card key={complaint.id} className="border border-siclo-light hover:shadow-sm transition-all duration-300">
                       <CardContent className="pt-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex gap-2">
+                        <div className="flex flex-col lg:flex-row justify-between items-start mb-3 space-y-2 lg:space-y-0">
+                          <div className="flex flex-wrap gap-2">
                             <Badge className={`${getStatusColor(complaint.status)} border`}>
                               {complaint.status}
                             </Badge>
@@ -371,7 +372,7 @@ const AdminPanel = () => {
                 <CardContent className="pt-6">
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {managers.map((manager) => (
-                      <Card key={manager.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
+                      <Card key={manager.id} className="border border-siclo-light hover:shadow-sm transition-all duration-300">
                         <CardContent className="pt-4">
                           <div className="flex justify-between items-start">
                             <div>

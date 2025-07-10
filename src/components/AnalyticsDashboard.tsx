@@ -69,7 +69,7 @@ const AnalyticsDashboard = () => {
     const mediumPriority = complaints.filter(c => c.priority === 'Media').length;
     const lowPriority = complaints.filter(c => c.priority === 'Baja').length;
 
-    // Store performance
+    // Store performance - only show stores with complaints
     const storeStats = MOCK_STORES.map(store => {
       const storeComplaints = complaints.filter(c => c.store === store.id);
       const storeResolved = storeComplaints.filter(c => c.status === 'Resuelta').length;
@@ -87,14 +87,16 @@ const AnalyticsDashboard = () => {
             return acc + days;
           }, 0) / storeComplaints.length : 0
       };
-    }).sort((a, b) => b.total - a.total);
+    }).filter(store => store.total > 0) // Only show stores with complaints
+    .sort((a, b) => b.total - a.total);
 
     // Type analysis
     const typeStats = OBSERVATION_TYPES.map(type => ({
       name: type,
       count: complaints.filter(c => c.observationType === type).length,
       resolved: complaints.filter(c => c.observationType === type && c.status === 'Resuelta').length
-    })).sort((a, b) => b.count - a.count);
+    })).filter(type => type.count > 0) // Only show types with complaints
+    .sort((a, b) => b.count - a.count);
 
     return {
       total,
@@ -118,7 +120,7 @@ const AnalyticsDashboard = () => {
   const stats = getAdvancedStats();
 
   const StatCard = ({ title, value, subtitle, icon: Icon, trend, trendValue, color = "siclo-blue" }: any) => (
-    <Card className="siclo-card hover:shadow-xl transition-all duration-300">
+    <Card className="siclo-card hover:shadow-lg transition-all duration-300">
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -135,7 +137,7 @@ const AnalyticsDashboard = () => {
             </div>
             {subtitle && <p className="text-xs text-siclo-dark/60">{subtitle}</p>}
           </div>
-          <div className={`w-12 h-12 bg-gradient-to-br from-${color} to-${color === 'siclo-blue' ? 'siclo-green' : 'siclo-blue'} rounded-xl flex items-center justify-center shadow-lg`}>
+          <div className={`w-12 h-12 bg-gradient-to-br from-${color} to-${color === 'siclo-blue' ? 'siclo-green' : 'siclo-blue'} rounded-xl flex items-center justify-center shadow-sm`}>
             <Icon className="h-6 w-6 text-white" />
           </div>
         </div>
@@ -269,76 +271,80 @@ const AnalyticsDashboard = () => {
         </Card>
       </div>
 
-      {/* Store Performance */}
-      <Card className="siclo-card">
-        <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
-          <CardTitle className="text-siclo-dark flex items-center">
-            <Building2 className="h-5 w-5 mr-2" />
-            Rendimiento por Local
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stats.storeStats.map((store) => (
-              <div key={store.id} className="border border-siclo-light rounded-xl p-4 hover:shadow-lg transition-all duration-300">
-                <div className="flex justify-between items-start mb-3">
-                  <h4 className="font-semibold text-siclo-dark">{store.name}</h4>
-                  <Badge 
-                    className={
-                      store.resolutionRate >= 80 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
-                      store.resolutionRate >= 60 ? 'bg-amber-100 text-amber-800 border-amber-200' :
-                      'bg-red-100 text-red-800 border-red-200'
-                    }
-                  >
-                    {store.resolutionRate.toFixed(1)}%
-                  </Badge>
+      {/* Store Performance - Only shows stores with complaints */}
+      {stats.storeStats.length > 0 && (
+        <Card className="siclo-card">
+          <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
+            <CardTitle className="text-siclo-dark flex items-center">
+              <Building2 className="h-5 w-5 mr-2" />
+              Rendimiento por Local
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stats.storeStats.map((store) => (
+                <div key={store.id} className="border border-siclo-light rounded-xl p-4 hover:shadow-lg transition-all duration-300">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-semibold text-siclo-dark">{store.name}</h4>
+                    <Badge 
+                      className={
+                        store.resolutionRate >= 80 ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                        store.resolutionRate >= 60 ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                        'bg-red-100 text-red-800 border-red-200'
+                      }
+                    >
+                      {store.resolutionRate.toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-siclo-dark/70">Total quejas:</span>
+                      <span className="font-medium text-siclo-dark">{store.total}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-siclo-dark/70">Resueltas:</span>
+                      <span className="font-medium text-emerald-600">{store.resolved}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-siclo-dark/70">Promedio días:</span>
+                      <span className="font-medium text-siclo-blue">{store.avgDays.toFixed(1)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-siclo-dark/70">Total quejas:</span>
-                    <span className="font-medium text-siclo-dark">{store.total}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-siclo-dark/70">Resueltas:</span>
-                    <span className="font-medium text-emerald-600">{store.resolved}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-siclo-dark/70">Promedio días:</span>
-                    <span className="font-medium text-siclo-blue">{store.avgDays.toFixed(1)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Type Analysis */}
-      <Card className="siclo-card">
-        <CardHeader className="bg-gradient-to-r from-siclo-blue/10 to-siclo-green/10">
-          <CardTitle className="text-siclo-dark">Análisis por Tipo de Queja</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stats.typeStats.map((type, index) => (
-              <div key={index} className="border border-siclo-light rounded-xl p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-medium text-siclo-dark">{type.name}</h4>
-                  <Badge className="bg-siclo-light text-siclo-dark">
-                    {type.count}
-                  </Badge>
+      {/* Type Analysis - Only shows types with complaints */}
+      {stats.typeStats.length > 0 && (
+        <Card className="siclo-card">
+          <CardHeader className="bg-gradient-to-r from-siclo-blue/10 to-siclo-green/10">
+            <CardTitle className="text-siclo-dark">Análisis por Tipo de Queja</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stats.typeStats.map((type, index) => (
+                <div key={index} className="border border-siclo-light rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-medium text-siclo-dark">{type.name}</h4>
+                    <Badge className="bg-siclo-light text-siclo-dark">
+                      {type.count}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-siclo-dark/70">Resueltas:</span>
+                    <span className="font-medium text-emerald-600">
+                      {type.resolved} ({type.count > 0 ? ((type.resolved / type.count) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-siclo-dark/70">Resueltas:</span>
-                  <span className="font-medium text-emerald-600">
-                    {type.resolved} ({type.count > 0 ? ((type.resolved / type.count) * 100).toFixed(1) : 0}%)
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

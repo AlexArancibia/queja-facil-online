@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ComplaintForm from '@/components/ComplaintForm';
 import ComplaintSearch from '@/components/ComplaintSearch';
-import { MessageSquareText, Search, Users, ShieldCheck, Building2 } from 'lucide-react';
+import { MessageSquareText, Search, Users, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,11 +14,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-siclo-light/50">
+      <header className="bg-white/90 backdrop-blur-md shadow-sm border-b border-siclo-light/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+              <div className="w-10 h-10 siclo-gradient rounded-xl flex items-center justify-center shadow-sm">
                 <MessageSquareText className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -26,7 +26,7 @@ const Index = () => {
                 <p className="text-xs text-siclo-dark/60 font-medium">Sistema de Quejas y Sugerencias</p>
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               <Button 
                 variant="outline" 
                 onClick={() => navigate('/login')}
@@ -51,10 +51,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 siclo-gradient rounded-2xl mb-6 shadow-xl">
-            <Building2 className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="text-4xl font-bold text-siclo-dark mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-siclo-dark mb-4">
             ¿Tienes algo que decirnos?
           </h2>
           <p className="text-lg text-siclo-dark/70 max-w-2xl mx-auto leading-relaxed">
@@ -64,17 +61,17 @@ const Index = () => {
         </div>
 
         <Tabs defaultValue="nueva-queja" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-sm border border-siclo-light/50 h-auto sm:h-14">
             <TabsTrigger 
               value="nueva-queja" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-green data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-green data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-300 h-14 sm:h-auto"
             >
               <MessageSquareText className="h-5 w-5 mr-2" />
-              Registrar Queja
+              Nueva Queja
             </TabsTrigger>
             <TabsTrigger 
               value="buscar-queja" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-blue data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-blue data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-300 h-14 sm:h-auto"
             >
               <Search className="h-5 w-5 mr-2" />
               Consultar Estado
@@ -82,7 +79,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="nueva-queja">
-            <Card className="siclo-card border-0 shadow-2xl">
+            <Card className="siclo-card border-0 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-siclo-green/5 to-siclo-blue/5 border-b border-siclo-light/50">
                 <CardTitle className="text-siclo-dark text-xl">Nueva Queja o Sugerencia</CardTitle>
                 <CardDescription className="text-siclo-dark/60">
@@ -96,7 +93,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="buscar-queja">
-            <Card className="siclo-card border-0 shadow-2xl">
+            <Card className="siclo-card border-0 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-siclo-blue/5 to-siclo-green/5 border-b border-siclo-light/50">
                 <CardTitle className="text-siclo-dark text-xl">Consultar Estado de Queja</CardTitle>
                 <CardDescription className="text-siclo-dark/60">
