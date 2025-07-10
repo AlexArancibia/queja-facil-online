@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
-import { MOCK_STORES } from '@/types/complaint';
 import { 
   Store, 
   Plus, 
@@ -48,29 +48,8 @@ const StoreManagement = () => {
   }, []);
 
   const loadStores = () => {
-    // First load any custom stores from localStorage
-    const customStores = JSON.parse(localStorage.getItem('stores') || '[]');
-    
-    // Convert MOCK_STORES to the expected format and combine with custom stores
-    const mockStoresFormatted = MOCK_STORES.map(store => ({
-      id: store.id,
-      name: store.name,
-      address: store.address || 'Dirección no especificada',
-      phone: '',
-      manager: '',
-      hours: '',
-      status: 'active' as 'active' | 'inactive'
-    }));
-
-    // Merge existing stores, avoiding duplicates
-    const existingIds = customStores.map((s: Store) => s.id);
-    const newMockStores = mockStoresFormatted.filter(store => !existingIds.includes(store.id));
-    
-    const allStores = [...customStores, ...newMockStores];
-    setStores(allStores);
-    
-    // Save the merged stores back to localStorage
-    localStorage.setItem('stores', JSON.stringify(allStores));
+    const existingStores = JSON.parse(localStorage.getItem('stores') || '[]');
+    setStores(existingStores);
   };
 
   const generateStoreId = () => {
@@ -250,7 +229,7 @@ const StoreManagement = () => {
       {/* Stores List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {stores.map((store) => (
-          <Card key={store.id} className="siclo-card hover:shadow-lg transition-all duration-300">
+          <Card key={store.id} className="siclo-card hover:shadow-xl transition-all duration-300">
             <CardContent className="pt-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-3">
