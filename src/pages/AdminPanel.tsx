@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complaint';
 import AddManagerForm from '@/components/AddManagerForm';
+import StoreManagement from '@/components/StoreManagement';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import { 
   MessageSquareText, 
   LogOut, 
@@ -96,53 +98,37 @@ const AdminPanel = () => {
     return true;
   });
 
-  const getStats = () => {
+  const getQuickStats = () => {
     const total = complaints.length;
     const pending = complaints.filter(c => c.status === 'Pendiente').length;
-    const inProgress = complaints.filter(c => c.status === 'En proceso').length;
     const resolved = complaints.filter(c => c.status === 'Resuelta').length;
-    const rejected = complaints.filter(c => c.status === 'Rechazada').length;
+    const totalManagers = managers.length;
 
-    const byStore = MOCK_STORES.map(store => ({
-      name: store.name,
-      count: complaints.filter(c => c.store === store.id).length
-    }));
-
-    const byType = OBSERVATION_TYPES.map(type => ({
-      name: type,
-      count: complaints.filter(c => c.observationType === type).length
-    }));
-
-    return {
-      total,
-      pending,
-      inProgress,
-      resolved,
-      rejected,
-      byStore,
-      byType,
-      totalManagers: managers.length
-    };
+    return { total, pending, resolved, totalManagers };
   };
 
-  const stats = getStats();
+  const quickStats = getQuickStats();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-siclo-light to-white">
+    <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-siclo-light">
+      <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-siclo-light/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 siclo-gradient rounded-lg flex items-center justify-center">
-                <Shield className="h-6 w-6 text-white" />
+              <div className="w-12 h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="h-7 w-7 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-siclo-dark">Panel Administrador - Siclo</h1>
                 <p className="text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
               </div>
             </div>
-            <Button variant="outline" onClick={logout} className="border-siclo-green text-siclo-green hover:bg-siclo-green hover:text-white">
+            <Button 
+              variant="outline" 
+              onClick={logout} 
+              className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar Sesión
             </Button>
@@ -152,36 +138,40 @@ const AdminPanel = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <BarChart3 className="h-4 w-4 mr-2" />
               Resumen
             </TabsTrigger>
-            <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+            <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <MessageSquareText className="h-4 w-4 mr-2" />
               Quejas
             </TabsTrigger>
-            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Users className="h-4 w-4 mr-2" />
               Managers
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+            <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <Building2 className="h-4 w-4 mr-2" />
+              Locales
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <PieChart className="h-4 w-4 mr-2" />
               Analíticas
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Main Stats */}
+            {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="siclo-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Total Quejas</p>
-                      <p className="text-3xl font-bold text-siclo-dark">{stats.total}</p>
+                      <p className="text-3xl font-bold text-siclo-dark">{quickStats.total}</p>
                     </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-xl flex items-center justify-center shadow-lg">
                       <MessageSquareText className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -193,9 +183,9 @@ const AdminPanel = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Managers</p>
-                      <p className="text-3xl font-bold text-siclo-dark">{stats.totalManagers}</p>
+                      <p className="text-3xl font-bold text-siclo-dark">{quickStats.totalManagers}</p>
                     </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                       <Users className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -207,9 +197,9 @@ const AdminPanel = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Resueltas</p>
-                      <p className="text-3xl font-bold text-emerald-600">{stats.resolved}</p>
+                      <p className="text-3xl font-bold text-emerald-600">{quickStats.resolved}</p>
                     </div>
-                    <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
                       <CheckCircle className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -221,9 +211,9 @@ const AdminPanel = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-siclo-dark/70">Pendientes</p>
-                      <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
+                      <p className="text-3xl font-bold text-amber-600">{quickStats.pending}</p>
                     </div>
-                    <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg">
                       <Clock className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -231,22 +221,30 @@ const AdminPanel = () => {
               </Card>
             </div>
 
-            {/* Quick Stats by Store */}
+            {/* Recent Activity Summary */}
             <Card className="siclo-card">
               <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
                 <CardTitle className="text-siclo-dark flex items-center">
-                  <Store className="h-5 w-5 mr-2" />
-                  Quejas por Local
+                  <Activity className="h-5 w-5 mr-2" />
+                  Resumen de Actividad
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {stats.byStore.map((store, index) => (
-                    <div key={index} className="bg-siclo-light/50 rounded-lg p-4">
-                      <p className="font-medium text-siclo-dark">{store.name}</p>
-                      <p className="text-2xl font-bold text-siclo-blue">{store.count}</p>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
+                    <p className="text-2xl font-bold text-siclo-blue">{MOCK_STORES.length}</p>
+                    <p className="text-sm text-siclo-dark/70">Locales Activos</p>
+                  </div>
+                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
+                    <p className="text-2xl font-bold text-siclo-green">{quickStats.totalManagers}</p>
+                    <p className="text-sm text-siclo-dark/70">Managers Registrados</p>
+                  </div>
+                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
+                    <p className="text-2xl font-bold text-amber-600">
+                      {quickStats.total > 0 ? ((quickStats.resolved / quickStats.total) * 100).toFixed(1) : 0}%
+                    </p>
+                    <p className="text-sm text-siclo-dark/70">Tasa de Resolución</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -302,13 +300,13 @@ const AdminPanel = () => {
             <Card className="siclo-card">
               <CardHeader>
                 <CardTitle className="text-siclo-dark">
-                  Todas las Quejas ({filteredComplaints.length})
+                  Quejas ({filteredComplaints.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {filteredComplaints.map((complaint) => (
-                    <Card key={complaint.id} className="border border-siclo-light">
+                    <Card key={complaint.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
                       <CardContent className="pt-4">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex gap-2">
@@ -339,7 +337,7 @@ const AdminPanel = () => {
                           </div>
                         </div>
                         
-                        <p className="text-sm text-siclo-dark/70 mt-2 truncate">
+                        <p className="text-sm text-siclo-dark/70 mt-2 line-clamp-2">
                           {complaint.detail}
                         </p>
                       </CardContent>
@@ -347,9 +345,9 @@ const AdminPanel = () => {
                   ))}
                   
                   {filteredComplaints.length === 0 && (
-                    <div className="text-center text-siclo-dark/60 py-8">
-                      <MessageSquareText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No hay quejas que coincidan con los filtros seleccionados</p>
+                    <div className="text-center text-siclo-dark/60 py-12">
+                      <MessageSquareText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg">No hay quejas que coincidan con los filtros</p>
                     </div>
                   )}
                 </div>
@@ -373,7 +371,7 @@ const AdminPanel = () => {
                 <CardContent className="pt-6">
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {managers.map((manager) => (
-                      <Card key={manager.id} className="border border-siclo-light">
+                      <Card key={manager.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
                         <CardContent className="pt-4">
                           <div className="flex justify-between items-start">
                             <div>
@@ -381,7 +379,7 @@ const AdminPanel = () => {
                               <p className="text-sm text-siclo-dark/70">{manager.email}</p>
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {manager.stores?.map((storeId: string) => (
-                                  <Badge key={storeId} variant="outline" className="text-xs">
+                                  <Badge key={storeId} variant="outline" className="text-xs border-siclo-green/30 text-siclo-green">
                                     {getStoreName(storeId)}
                                   </Badge>
                                 ))}
@@ -396,9 +394,9 @@ const AdminPanel = () => {
                     ))}
                     
                     {managers.length === 0 && (
-                      <div className="text-center text-siclo-dark/60 py-8">
-                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No hay managers registrados</p>
+                      <div className="text-center text-siclo-dark/60 py-12">
+                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg">No hay managers registrados</p>
                       </div>
                     )}
                   </div>
@@ -407,57 +405,12 @@ const AdminPanel = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6">
-            {/* Status Distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="siclo-card">
-                <CardHeader>
-                  <CardTitle className="text-siclo-dark flex items-center">
-                    <Activity className="h-5 w-5 mr-2" />
-                    Distribución por Estado
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-siclo-dark">Pendientes</span>
-                      <span className="font-bold text-amber-600">{stats.pending}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-siclo-dark">En Proceso</span>
-                      <span className="font-bold text-blue-600">{stats.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-siclo-dark">Resueltas</span>
-                      <span className="font-bold text-emerald-600">{stats.resolved}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-siclo-dark">Rechazadas</span>
-                      <span className="font-bold text-red-600">{stats.rejected}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <TabsContent value="stores" className="space-y-6">
+            <StoreManagement />
+          </TabsContent>
 
-              <Card className="siclo-card">
-                <CardHeader>
-                  <CardTitle className="text-siclo-dark flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2" />
-                    Distribución por Tipo
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {stats.byType.map((type, index) => (
-                      <div key={index} className="flex justify-between items-center">
-                        <span className="text-siclo-dark">{type.name}</span>
-                        <span className="font-bold text-siclo-blue">{type.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="analytics" className="space-y-6">
+            <AnalyticsDashboard />
           </TabsContent>
         </Tabs>
       </div>
