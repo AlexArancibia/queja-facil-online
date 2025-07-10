@@ -87,6 +87,6 @@
   }
   
   .siclo-card {
-    @apply bg-white/95 backdrop-blur-sm border border-siclo-light/60 rounded-xl shadow-sm hover:shadow-md transition-all duration-300;
+    @apply bg-white/95 backdrop-blur-sm border border-siclo-light/50 rounded-xl shadow-sm hover:shadow-sm transition-all duration-300;
   }
 }

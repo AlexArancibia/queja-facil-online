@@ -12,9 +12,9 @@ const Index = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/20">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-sm border-b border-siclo-light/50">
+      <header className="bg-white/90 backdrop-blur-md shadow-sm border-b border-siclo-light/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center space-x-3 mb-4 sm:mb-0">
@@ -61,7 +61,7 @@ const Index = () => {
         </div>
 
         <Tabs defaultValue="nueva-queja" className="w-full">
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-sm border border-siclo-light/50 h-auto sm:h-14">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-sm border border-siclo-light/40 h-auto sm:h-14">
             <TabsTrigger 
               value="nueva-queja" 
               className="flex items-center text-base font-medium data-[state=active]:bg-siclo-green data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-300 h-14 sm:h-auto"
@@ -79,13 +79,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="nueva-queja">
-            <Card className="siclo-card border-0 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-siclo-green/5 to-siclo-blue/5 border-b border-siclo-light/50">
-                <CardTitle className="text-siclo-dark text-xl">Nueva Queja o Sugerencia</CardTitle>
-                <CardDescription className="text-siclo-dark/60">
-                  Completa el formulario con todos los detalles. Recibirás un ID único para hacer seguimiento.
-                </CardDescription>
-              </CardHeader>
+            <Card className="siclo-card border-0 shadow-md">
               <CardContent className="pt-8">
                 <ComplaintForm />
               </CardContent>
@@ -93,8 +87,8 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="buscar-queja">
-            <Card className="siclo-card border-0 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-siclo-blue/5 to-siclo-green/5 border-b border-siclo-light/50">
+            <Card className="siclo-card border-0 shadow-md">
+              <CardHeader className="bg-gradient-to-r from-siclo-blue/5 to-siclo-green/5 border-b border-siclo-light/40">
                 <CardTitle className="text-siclo-dark text-xl">Consultar Estado de Queja</CardTitle>
                 <CardDescription className="text-siclo-dark/60">
                   Ingresa el ID de tu queja o tu correo electrónico para consultar el estado actual.
