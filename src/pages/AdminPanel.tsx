@@ -1,69 +1,87 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { type Complaint, MOCK_STORES } from '@/types/complaint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complaint';
+import AddManagerForm from '@/components/AddManagerForm';
 import { 
-  ShieldCheck, 
+  MessageSquareText, 
   LogOut, 
-  BarChart3, 
-  Users, 
+  Filter, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertTriangle,
+  Users,
   Store,
-  MessageSquareText,
+  Calendar,
+  User,
+  BarChart3,
   TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle
+  Building2,
+  Shield,
+  PieChart,
+  Activity
 } from 'lucide-react';
 
 const AdminPanel = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStore, setFilterStore] = useState('all');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       navigate('/login');
       return;
     }
-    loadComplaints();
+    loadData();
   }, [user, navigate]);
 
-  const loadComplaints = () => {
+  const loadData = () => {
+    // Load complaints
     const allComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
     setComplaints(allComplaints);
+
+    // Load managers
+    const allManagers = JSON.parse(localStorage.getItem('managers') || '[]');
+    setManagers(allManagers);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pendiente':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'En proceso':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'Resuelta':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
       case 'Rechazada':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'Alta':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200';
       case 'Media':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'Baja':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -72,67 +90,59 @@ const AdminPanel = () => {
     return store ? store.name : storeId;
   };
 
-  const getOverallStats = () => {
+  const filteredComplaints = complaints.filter(complaint => {
+    if (filterStatus !== 'all' && complaint.status !== filterStatus) return false;
+    if (filterStore !== 'all' && complaint.store !== filterStore) return false;
+    return true;
+  });
+
+  const getStats = () => {
     const total = complaints.length;
     const pending = complaints.filter(c => c.status === 'Pendiente').length;
     const inProgress = complaints.filter(c => c.status === 'En proceso').length;
     const resolved = complaints.filter(c => c.status === 'Resuelta').length;
     const rejected = complaints.filter(c => c.status === 'Rechazada').length;
 
-    return { total, pending, inProgress, resolved, rejected };
+    const byStore = MOCK_STORES.map(store => ({
+      name: store.name,
+      count: complaints.filter(c => c.store === store.id).length
+    }));
+
+    const byType = OBSERVATION_TYPES.map(type => ({
+      name: type,
+      count: complaints.filter(c => c.observationType === type).length
+    }));
+
+    return {
+      total,
+      pending,
+      inProgress,
+      resolved,
+      rejected,
+      byStore,
+      byType,
+      totalManagers: managers.length
+    };
   };
 
-  const getStoreStats = () => {
-    return MOCK_STORES.map(store => {
-      const storeComplaints = complaints.filter(c => c.store === store.id);
-      return {
-        ...store,
-        total: storeComplaints.length,
-        pending: storeComplaints.filter(c => c.status === 'Pendiente').length,
-        resolved: storeComplaints.filter(c => c.status === 'Resuelta').length,
-        resolutionRate: storeComplaints.length > 0 
-          ? ((storeComplaints.filter(c => c.status === 'Resuelta').length / storeComplaints.length) * 100).toFixed(1)
-          : '0'
-      };
-    });
-  };
-
-  const getTypeStats = () => {
-    const types = [...new Set(complaints.map(c => c.observationType))];
-    return types.map(type => ({
-      type,
-      count: complaints.filter(c => c.observationType === type).length,
-      percentage: ((complaints.filter(c => c.observationType === type).length / complaints.length) * 100).toFixed(1)
-    })).sort((a, b) => b.count - a.count);
-  };
-
-  const getPriorityStats = () => {
-    return [
-      { priority: 'Alta', count: complaints.filter(c => c.priority === 'Alta').length },
-      { priority: 'Media', count: complaints.filter(c => c.priority === 'Media').length },
-      { priority: 'Baja', count: complaints.filter(c => c.priority === 'Baja').length }
-    ];
-  };
-
-  const overallStats = getOverallStats();
-  const storeStats = getStoreStats();
-  const typeStats = getTypeStats();
-  const priorityStats = getPriorityStats();
+  const stats = getStats();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-siclo-light to-white">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-siclo-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <ShieldCheck className="h-8 w-8 text-primary mr-3" />
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 siclo-gradient rounded-lg flex items-center justify-center">
+                <Shield className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Panel Administrador</h1>
-                <p className="text-sm text-gray-600">Bienvenido, {user?.name}</p>
+                <h1 className="text-xl font-bold text-siclo-dark">Panel Administrador - Siclo</h1>
+                <p className="text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
               </div>
             </div>
-            <Button variant="outline" onClick={logout}>
+            <Button variant="outline" onClick={logout} className="border-siclo-green text-siclo-green hover:bg-siclo-green hover:text-white">
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar Sesión
             </Button>
@@ -141,277 +151,313 @@ const AdminPanel = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="estadisticas" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="estadisticas">Estadísticas</TabsTrigger>
-            <TabsTrigger value="quejas">Todas las Quejas</TabsTrigger>
-            <TabsTrigger value="locales">Gestión Locales</TabsTrigger>
-            <TabsTrigger value="managers">Gestión Managers</TabsTrigger>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+              <MessageSquareText className="h-4 w-4 mr-2" />
+              Quejas
+            </TabsTrigger>
+            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+              <Users className="h-4 w-4 mr-2" />
+              Managers
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white">
+              <PieChart className="h-4 w-4 mr-2" />
+              Analíticas
+            </TabsTrigger>
           </TabsList>
 
-          {/* Statistics Tab */}
-          <TabsContent value="estadisticas" className="space-y-6">
-            {/* Overall Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-              <Card>
+          <TabsContent value="overview" className="space-y-6">
+            {/* Main Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="pt-6">
-                  <div className="flex items-center">
-                    <MessageSquareText className="h-8 w-8 text-blue-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Total Quejas</p>
-                      <p className="text-2xl font-semibold text-gray-900">{overallStats.total}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-siclo-dark/70">Total Quejas</p>
+                      <p className="text-3xl font-bold text-siclo-dark">{stats.total}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-full flex items-center justify-center">
+                      <MessageSquareText className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="pt-6">
-                  <div className="flex items-center">
-                    <Clock className="h-8 w-8 text-yellow-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Pendientes</p>
-                      <p className="text-2xl font-semibold text-gray-900">{overallStats.pending}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-siclo-dark/70">Managers</p>
+                      <p className="text-3xl font-bold text-siclo-dark">{stats.totalManagers}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Users className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="pt-6">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-8 w-8 text-blue-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">En Proceso</p>
-                      <p className="text-2xl font-semibold text-gray-900">{overallStats.inProgress}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-siclo-dark/70">Resueltas</p>
+                      <p className="text-3xl font-bold text-emerald-600">{stats.resolved}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
                 <CardContent className="pt-6">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Resueltas</p>
-                      <p className="text-2xl font-semibold text-gray-900">{overallStats.resolved}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-siclo-dark/70">Pendientes</p>
+                      <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center">
-                    <XCircle className="h-8 w-8 text-red-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Rechazadas</p>
-                      <p className="text-2xl font-semibold text-gray-900">{overallStats.rejected}</p>
+                    <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
+            {/* Quick Stats by Store */}
+            <Card className="siclo-card">
+              <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
+                <CardTitle className="text-siclo-dark flex items-center">
+                  <Store className="h-5 w-5 mr-2" />
+                  Quejas por Local
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {stats.byStore.map((store, index) => (
+                    <div key={index} className="bg-siclo-light/50 rounded-lg p-4">
+                      <p className="font-medium text-siclo-dark">{store.name}</p>
+                      <p className="text-2xl font-bold text-siclo-blue">{store.count}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="complaints" className="space-y-6">
+            {/* Filters */}
+            <Card className="siclo-card">
+              <CardHeader>
+                <CardTitle className="flex items-center text-siclo-dark">
+                  <Filter className="h-5 w-5 mr-2" />
+                  Filtros
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4">
+                  <div>
+                    <Label className="text-siclo-dark font-medium">Estado</Label>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los estados</SelectItem>
+                        <SelectItem value="Pendiente">Pendiente</SelectItem>
+                        <SelectItem value="En proceso">En proceso</SelectItem>
+                        <SelectItem value="Resuelta">Resuelta</SelectItem>
+                        <SelectItem value="Rechazada">Rechazada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-siclo-dark font-medium">Local</Label>
+                    <Select value={filterStore} onValueChange={setFilterStore}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los locales</SelectItem>
+                        {MOCK_STORES.map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Complaints List */}
+            <Card className="siclo-card">
+              <CardHeader>
+                <CardTitle className="text-siclo-dark">
+                  Todas las Quejas ({filteredComplaints.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {filteredComplaints.map((complaint) => (
+                    <Card key={complaint.id} className="border border-siclo-light">
+                      <CardContent className="pt-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex gap-2">
+                            <Badge className={`${getStatusColor(complaint.status)} border`}>
+                              {complaint.status}
+                            </Badge>
+                            <Badge className={`${getPriorityColor(complaint.priority)} border`}>
+                              {complaint.priority}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-siclo-dark/60 flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(complaint.createdAt).toLocaleDateString('es-ES')}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2 text-siclo-green" />
+                            <span className="font-medium text-siclo-dark">{complaint.fullName}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Store className="h-4 w-4 mr-2 text-siclo-blue" />
+                            <span className="text-siclo-dark/70">{getStoreName(complaint.store)}</span>
+                          </div>
+                          <div className="text-siclo-dark/70">
+                            {complaint.observationType}
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-siclo-dark/70 mt-2 truncate">
+                          {complaint.detail}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {filteredComplaints.length === 0 && (
+                    <div className="text-center text-siclo-dark/60 py-8">
+                      <MessageSquareText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No hay quejas que coincidan con los filtros seleccionados</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="managers" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Store Performance */}
-              <Card>
+              {/* Add Manager Form */}
+              <AddManagerForm onManagerAdded={loadData} />
+
+              {/* Existing Managers */}
+              <Card className="siclo-card">
+                <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
+                  <CardTitle className="text-siclo-dark flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Managers Existentes ({managers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {managers.map((manager) => (
+                      <Card key={manager.id} className="border border-siclo-light">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-siclo-dark">{manager.name}</p>
+                              <p className="text-sm text-siclo-dark/70">{manager.email}</p>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {manager.stores?.map((storeId: string) => (
+                                  <Badge key={storeId} variant="outline" className="text-xs">
+                                    {getStoreName(storeId)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                            <Badge className="bg-siclo-green/10 text-siclo-green border-siclo-green">
+                              Manager
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    
+                    {managers.length === 0 && (
+                      <div className="text-center text-siclo-dark/60 py-8">
+                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No hay managers registrados</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            {/* Status Distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="siclo-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Store className="h-5 w-5 mr-2" />
-                    Rendimiento por Local
+                  <CardTitle className="text-siclo-dark flex items-center">
+                    <Activity className="h-5 w-5 mr-2" />
+                    Distribución por Estado
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {storeStats.map((store) => (
-                      <div key={store.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{store.name}</p>
-                          <p className="text-sm text-gray-600">{store.address}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold">{store.total}</p>
-                          <p className="text-sm text-green-600">{store.resolutionRate}% resueltas</p>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="flex justify-between items-center">
+                      <span className="text-siclo-dark">Pendientes</span>
+                      <span className="font-bold text-amber-600">{stats.pending}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-siclo-dark">En Proceso</span>
+                      <span className="font-bold text-blue-600">{stats.inProgress}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-siclo-dark">Resueltas</span>
+                      <span className="font-bold text-emerald-600">{stats.resolved}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-siclo-dark">Rechazadas</span>
+                      <span className="font-bold text-red-600">{stats.rejected}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Complaint Types */}
-              <Card>
+              <Card className="siclo-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2" />
-                    Tipos de Quejas
+                  <CardTitle className="text-siclo-dark flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2" />
+                    Distribución por Tipo
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {typeStats.map((stat) => (
-                      <div key={stat.type} className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{stat.type}</span>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600 mr-2">{stat.count}</span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${stat.percentage}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-500 ml-2">{stat.percentage}%</span>
-                        </div>
+                  <div className="space-y-4">
+                    {stats.byType.map((type, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-siclo-dark">{type.name}</span>
+                        <span className="font-bold text-siclo-blue">{type.count}</span>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Priority Distribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="h-5 w-5 mr-2" />
-                  Distribución por Prioridad
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  {priorityStats.map((stat) => (
-                    <div key={stat.priority} className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-2xl font-bold">{stat.count}</p>
-                      <Badge className={getPriorityColor(stat.priority)}>
-                        {stat.priority}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* All Complaints Tab */}
-          <TabsContent value="quejas">
-            <Card>
-              <CardHeader>
-                <CardTitle>Todas las Quejas ({complaints.length})</CardTitle>
-                <CardDescription>Vista completa de todas las quejas del sistema</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {complaints.map((complaint) => (
-                    <div key={complaint.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <p className="font-medium">{complaint.id}</p>
-                          <p className="text-sm text-gray-600">{complaint.fullName} • {complaint.email}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge className={getStatusColor(complaint.status)}>
-                            {complaint.status}
-                          </Badge>
-                          <Badge className={getPriorityColor(complaint.priority)}>
-                            {complaint.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p><strong>Local:</strong> {getStoreName(complaint.store)}</p>
-                          <p><strong>Tipo:</strong> {complaint.observationType}</p>
-                        </div>
-                        <div>
-                          <p><strong>Fecha:</strong> {new Date(complaint.createdAt).toLocaleDateString('es-ES')}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-700 mt-2 bg-gray-50 p-2 rounded">
-                        {complaint.detail}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Stores Management Tab */}
-          <TabsContent value="locales">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Store className="h-5 w-5 mr-2" />
-                  Gestión de Locales
-                </CardTitle>
-                <CardDescription>Administrar locales del sistema</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {MOCK_STORES.map((store) => {
-                    const storeComplaints = complaints.filter(c => c.store === store.id);
-                    return (
-                      <Card key={store.id}>
-                        <CardContent className="pt-4">
-                          <h3 className="font-semibold text-lg">{store.name}</h3>
-                          <p className="text-gray-600 text-sm mb-3">{store.address}</p>
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm text-gray-600">Total quejas: {storeComplaints.length}</p>
-                              <p className="text-sm text-gray-600">
-                                Resueltas: {storeComplaints.filter(c => c.status === 'Resuelta').length}
-                              </p>
-                            </div>
-                            <Button variant="outline" size="sm">
-                              Editar
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Managers Tab */}
-          <TabsContent value="managers">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  Gestión de Managers
-                </CardTitle>
-                <CardDescription>Administrar managers del sistema</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="font-semibold">Ana García</h3>
-                          <p className="text-sm text-gray-600">manager@tienda.com</p>
-                          <p className="text-sm text-gray-600">Locales: Tienda Centro, Tienda Norte</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Editar</Button>
-                          <Button variant="outline" size="sm">Desactivar</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Button className="w-full">
-                    <Users className="h-4 w-4 mr-2" />
-                    Agregar Nuevo Manager
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

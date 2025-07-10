@@ -3,87 +3,93 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design system with DM Sans font and complaint platform colors */
+/* Design system with DM Sans font and Siclo brand colors */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 210 54% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 210 54% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 210 54% 20%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 147 27% 40%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 210 54% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 210 54% 20%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 147 27% 40%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 210 54% 20%;
+    --sidebar-primary: 147 27% 40%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 210 54% 20%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 147 27% 40%;
+
+    /* Siclo brand colors */
+    --siclo-green: 147 27% 40%;
+    --siclo-blue: 210 54% 29%;
+    --siclo-light: 220 14% 96%;
+    --siclo-dark: 210 54% 20%;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 210 54% 10%;
     --foreground: 0 0% 98%;
 
-    --card: 240 10% 3.9%;
+    --card: 210 54% 12%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 240 10% 3.9%;
+    --popover: 210 54% 12%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 147 27% 40%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 3.7% 15.9%;
+    --secondary: 210 54% 15%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 210 54% 15%;
+    --muted-foreground: 220 14% 65%;
 
-    --accent: 240 3.7% 15.9%;
+    --accent: 210 54% 15%;
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 221 83% 53%;
+    --border: 210 54% 15%;
+    --input: 210 54% 15%;
+    --ring: 147 27% 40%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 210 54% 10%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 147 27% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 210 54% 15%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 210 54% 15%;
+    --sidebar-ring: 147 27% 40%;
   }
 }
 
@@ -94,5 +100,20 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+    background: linear-gradient(135deg, hsl(var(--siclo-light)) 0%, hsl(var(--background)) 100%);
+  }
+}
+
+@layer components {
+  .siclo-gradient {
+    background: linear-gradient(135deg, hsl(var(--siclo-green)) 0%, hsl(var(--siclo-blue)) 100%);
+  }
+  
+  .siclo-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
+  }
+  
+  .siclo-button {
+    @apply bg-gradient-to-r from-siclo-green to-siclo-blue text-white shadow-lg hover:shadow-xl transition-all duration-300;
   }
 }
