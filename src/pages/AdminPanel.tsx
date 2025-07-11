@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,10 +12,19 @@ import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complain
 import { type Rating } from '@/types/instructor';
 import AddManagerForm from '@/components/AddManagerForm';
 import StoreManagement from '@/components/StoreManagement';
-import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import InstructorManagement from '@/components/InstructorManagement';
 import DashboardStats from '@/components/DashboardStats';
 import RecentActivity from '@/components/RecentActivity';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { 
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { 
   MessageSquareText, 
   LogOut, 
@@ -38,6 +46,7 @@ import {
   GraduationCap,
   Star
 } from 'lucide-react';
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 // Create a proper combined type for unified activity view
 type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
@@ -54,6 +63,10 @@ const AdminPanel = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const itemsPerPage = 15;
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -97,14 +110,29 @@ const AdminPanel = () => {
     return store ? store.name : storeId;
   };
 
+  // Filter data by date range
+  const filterByDateRange = (data: any[]) => {
+    if (!startDate && !endDate) return data;
+    
+    return data.filter(item => {
+      const itemDate = new Date(item.createdAt);
+      if (startDate && itemDate < startDate) return false;
+      if (endDate && itemDate > endDate) return false;
+      return true;
+    });
+  };
+
+  const filteredComplaints = filterByDateRange(complaints);
+  const filteredRatings = filterByDateRange(ratings);
+
   // Combine complaints and ratings for unified view
   const combinedData: CombinedActivity[] = [
-    ...complaints.map(complaint => ({
+    ...filteredComplaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
       activityDate: new Date(complaint.createdAt)
     })),
-    ...ratings.map(rating => ({
+    ...filteredRatings.map(rating => ({
       ...rating,
       type: 'rating' as const,
       activityDate: new Date(rating.createdAt),
@@ -120,13 +148,18 @@ const AdminPanel = () => {
     return true;
   }).sort((a, b) => b.activityDate.getTime() - a.activityDate.getTime());
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
   const getQuickStats = () => {
-    const totalComplaints = complaints.length;
-    const totalRatings = ratings.length;
-    const pendingComplaints = complaints.filter(c => c.status === 'Pendiente').length;
-    const resolvedComplaints = complaints.filter(c => c.status === 'Resuelta').length;
-    const averageRating = ratings.length > 0 
-      ? ratings.reduce((acc, rating) => {
+    const totalComplaints = filteredComplaints.length;
+    const totalRatings = filteredRatings.length;
+    const pendingComplaints = filteredComplaints.filter(c => c.status === 'Pendiente').length;
+    const resolvedComplaints = filteredComplaints.filter(c => c.status === 'Resuelta').length;
+    const averageRating = filteredRatings.length > 0 
+      ? filteredRatings.reduce((acc, rating) => {
           const avgRating = (
             rating.instructorRating +
             rating.cleanlinessRating +
@@ -136,7 +169,7 @@ const AdminPanel = () => {
             rating.punctualityRating
           ) / 6;
           return acc + avgRating;
-        }, 0) / ratings.length
+        }, 0) / filteredRatings.length
       : 0;
     const totalManagers = managers.length;
 
@@ -144,6 +177,20 @@ const AdminPanel = () => {
   };
 
   const quickStats = getQuickStats();
+
+  // Data for pie charts
+  const statusData = [
+    { name: 'Pendiente', value: filteredComplaints.filter(c => c.status === 'Pendiente').length, color: '#f59e0b' },
+    { name: 'En proceso', value: filteredComplaints.filter(c => c.status === 'En proceso').length, color: '#3b82f6' },
+    { name: 'Resuelta', value: filteredComplaints.filter(c => c.status === 'Resuelta').length, color: '#10b981' },
+    { name: 'Rechazada', value: filteredComplaints.filter(c => c.status === 'Rechazada').length, color: '#ef4444' },
+  ].filter(item => item.value > 0);
+
+  const priorityData = [
+    { name: 'Alta', value: filteredComplaints.filter(c => c.priority === 'Alta').length, color: '#ef4444' },
+    { name: 'Media', value: filteredComplaints.filter(c => c.priority === 'Media').length, color: '#f59e0b' },
+    { name: 'Baja', value: filteredComplaints.filter(c => c.priority === 'Baja').length, color: '#10b981' },
+  ].filter(item => item.value > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
@@ -202,8 +249,139 @@ const AdminPanel = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <DashboardStats complaints={complaints} ratings={ratings} />
-            <RecentActivity complaints={complaints} ratings={ratings} />
+            {/* Date Range Filter */}
+            <Card className="siclo-card border-2 border-siclo-light/30">
+              <CardHeader>
+                <CardTitle className="flex items-center text-siclo-dark">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Filtrar por Rango de Fechas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DateRangeFilter
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={setStartDate}
+                  onEndDateChange={setEndDate}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Dashboard Stats with icons fix */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="siclo-card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-red-700">Total Quejas</p>
+                      <p className="text-3xl font-bold text-red-900">{quickStats.totalComplaints}</p>
+                    </div>
+                    <MessageSquareText className="h-8 w-8 text-red-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="siclo-card bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">Total Calificaciones</p>
+                      <p className="text-3xl font-bold text-blue-900">{quickStats.totalRatings}</p>
+                    </div>
+                    <Star className="h-8 w-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="siclo-card bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-700">Quejas Pendientes</p>
+                      <p className="text-3xl font-bold text-amber-900">{quickStats.pendingComplaints}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-amber-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="siclo-card bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700">Quejas Resueltas</p>
+                      <p className="text-3xl font-bold text-emerald-900">{quickStats.resolvedComplaints}</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-emerald-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Pie Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="siclo-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-siclo-dark">
+                    <PieChart className="h-5 w-5 mr-2" />
+                    Estados de Quejas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={statusData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="siclo-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-siclo-dark">
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    Distribución por Prioridad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={priorityData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {priorityData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <RecentActivity complaints={filteredComplaints} ratings={filteredRatings} />
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-6">
@@ -265,16 +443,21 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
 
-            {/* Combined Activity List */}
+            {/* Combined Activity List with Pagination */}
             <Card className="siclo-card">
               <CardHeader>
-                <CardTitle className="text-siclo-dark">
-                  Actividad Reciente ({filteredData.length})
-                </CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-siclo-dark">
+                    Actividad Reciente ({filteredData.length})
+                  </CardTitle>
+                  <Badge variant="outline" className="border-siclo-green text-siclo-green">
+                    Página {currentPage} de {totalPages || 1}
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {filteredData.map((item) => (
+                  {paginatedData.map((item) => (
                     <Card key={item.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
                       <CardContent className="pt-4">
                         <div className="flex justify-between items-start mb-3">
@@ -336,13 +519,70 @@ const AdminPanel = () => {
                     </Card>
                   ))}
                   
-                  {filteredData.length === 0 && (
+                  {paginatedData.length === 0 && (
                     <div className="text-center text-siclo-dark/60 py-12">
                       <Activity className="h-16 w-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg">No hay actividad que coincida con los filtros</p>
                     </div>
                   )}
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-6 flex justify-center">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            href="#" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage > 1) setCurrentPage(currentPage - 1);
+                            }}
+                          />
+                        </PaginationItem>
+                        
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                          let page;
+                          if (totalPages <= 5) {
+                            page = i + 1;
+                          } else {
+                            const start = Math.max(1, currentPage - 2);
+                            page = start + i;
+                          }
+                          
+                          if (page <= totalPages) {
+                            return (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setCurrentPage(page);
+                                  }}
+                                  isActive={currentPage === page}
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            );
+                          }
+                          return null;
+                        })}
+                        
+                        <PaginationItem>
+                          <PaginationNext 
+                            href="#" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                            }}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -403,7 +643,25 @@ const AdminPanel = () => {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-            <AnalyticsDashboard />
+            {/* Date Range Filter for Analytics */}
+            <Card className="siclo-card border-2 border-siclo-light/30">
+              <CardHeader>
+                <CardTitle className="flex items-center text-siclo-dark">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Filtrar Analíticas por Rango de Fechas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DateRangeFilter
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={setStartDate}
+                  onEndDateChange={setEndDate}
+                />
+              </CardContent>
+            </Card>
+            
+            <DashboardStats complaints={filteredComplaints} ratings={filteredRatings} />
           </TabsContent>
         </Tabs>
       </div>

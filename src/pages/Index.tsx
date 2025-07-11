@@ -1,115 +1,118 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import ComplaintForm from '@/components/ComplaintForm';
 import ComplaintSearch from '@/components/ComplaintSearch';
-import { MessageSquareText, Search, Users, ShieldCheck, Building2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, LogIn, MessageSquareText, Search } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'create' | 'search'>('create');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
-      {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-lg border-b border-siclo-light/50">
+      {/* Enhanced Header similar to ratings page */}
+      <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-siclo-light/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
-                <MessageSquareText className="h-6 w-6 text-white" />
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="text-siclo-dark hover:bg-siclo-light/50 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver
+              </Button>
+              <div className="w-12 h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
+                <MessageSquareText className="h-7 w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-siclo-dark">Siclo</h1>
-                <p className="text-xs text-siclo-dark/60 font-medium">Sistema de Quejas y Sugerencias</p>
+                <h1 className="text-xl font-bold text-siclo-dark">Sistema de Quejas - Siclo</h1>
+                <p className="text-sm text-siclo-dark/70">Reporta incidencias o busca el estado de tu queja</p>
               </div>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Managers
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-blue/30 text-siclo-blue hover:bg-siclo-blue hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                Admin
-              </Button>
-            </div>
+            <Button
+              onClick={() => navigate('/login')}
+              className="siclo-button shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Iniciar Sesión
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 siclo-gradient rounded-2xl mb-6 shadow-xl">
-            <Building2 className="h-8 w-8 text-white" />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tab Selection */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-lg border border-siclo-light/50">
+            <div className="flex space-x-2">
+              <Button
+                variant={activeTab === 'create' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('create')}
+                className={`px-6 py-3 rounded-lg transition-all duration-300 ${
+                  activeTab === 'create'
+                    ? 'siclo-button shadow-md'
+                    : 'text-siclo-dark hover:bg-siclo-light/50'
+                }`}
+              >
+                <MessageSquareText className="h-4 w-4 mr-2" />
+                Crear Queja
+              </Button>
+              <Button
+                variant={activeTab === 'search' ? 'default' : 'ghost'}
+                onClick={() => setActiveTab('search')}
+                className={`px-6 py-3 rounded-lg transition-all duration-300 ${
+                  activeTab === 'search'
+                    ? 'siclo-button shadow-md'
+                    : 'text-siclo-dark hover:bg-siclo-light/50'
+                }`}
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Buscar Queja
+              </Button>
+            </div>
           </div>
-          <h2 className="text-4xl font-bold text-siclo-dark mb-4">
-            ¿Tienes algo que decirnos?
-          </h2>
-          <p className="text-lg text-siclo-dark/70 max-w-2xl mx-auto leading-relaxed">
-            Tu opinión nos ayuda a mejorar. Registra tu queja o sugerencia de forma rápida y segura, 
-            o consulta el estado de una queja anterior.
-          </p>
         </div>
 
-        <Tabs defaultValue="nueva-queja" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
-            <TabsTrigger 
-              value="nueva-queja" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-green data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-            >
-              <MessageSquareText className="h-5 w-5 mr-2" />
-              Registrar Queja
-            </TabsTrigger>
-            <TabsTrigger 
-              value="buscar-queja" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-blue data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-            >
-              <Search className="h-5 w-5 mr-2" />
-              Consultar Estado
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="nueva-queja">
-            <Card className="siclo-card border-0 shadow-2xl">
-              <CardHeader className="bg-gradient-to-r from-siclo-green/5 to-siclo-blue/5 border-b border-siclo-light/50">
-                <CardTitle className="text-siclo-dark text-xl">Nueva Queja o Sugerencia</CardTitle>
-                <CardDescription className="text-siclo-dark/60">
-                  Completa el formulario con todos los detalles. Recibirás un ID único para hacer seguimiento.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-8">
-                <ComplaintForm />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="buscar-queja">
-            <Card className="siclo-card border-0 shadow-2xl">
-              <CardHeader className="bg-gradient-to-r from-siclo-blue/5 to-siclo-green/5 border-b border-siclo-light/50">
-                <CardTitle className="text-siclo-dark text-xl">Consultar Estado de Queja</CardTitle>
-                <CardDescription className="text-siclo-dark/60">
-                  Ingresa el ID de tu queja o tu correo electrónico para consultar el estado actual.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-8">
-                <ComplaintSearch />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+        {/* Content */}
+        {activeTab === 'create' ? (
+          <Card className="siclo-card shadow-2xl border-2 border-siclo-light/30">
+            <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10 rounded-t-lg">
+              <CardTitle className="text-2xl text-siclo-dark flex items-center">
+                <MessageSquareText className="h-6 w-6 mr-3 text-siclo-green" />
+                Formulario de Quejas
+              </CardTitle>
+              <CardDescription className="text-siclo-dark/70 text-base">
+                Reporta cualquier incidencia o problema que hayas experimentado en nuestras instalaciones.
+                Tu feedback es importante para nosotros.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-8">
+              <ComplaintForm />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="siclo-card shadow-2xl border-2 border-siclo-light/30">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-siclo-light/20 rounded-t-lg">
+              <CardTitle className="text-2xl text-siclo-dark flex items-center">
+                <Search className="h-6 w-6 mr-3 text-siclo-blue" />
+                Buscar Estado de Queja
+              </CardTitle>
+              <CardDescription className="text-siclo-dark/70 text-base">
+                Consulta el estado actual de tu queja ingresando tu email y el ID de la queja.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-8">
+              <ComplaintSearch />
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };
