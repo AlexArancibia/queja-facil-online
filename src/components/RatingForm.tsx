@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,9 +68,20 @@ const RatingForm = () => {
       
       const newRating: Rating = {
         id: `rating-${Date.now()}`,
-        ...data,
+        instructorId: data.instructorId,
+        storeId: data.storeId,
         discipline: instructor?.discipline || '',
         instructorName: instructor?.name || '',
+        date: data.date,
+        schedule: data.schedule,
+        npsScore: data.npsScore,
+        instructorRating: data.instructorRating,
+        cleanlinessRating: data.cleanlinessRating,
+        audioRating: data.audioRating,
+        attentionQualityRating: data.attentionQualityRating,
+        amenitiesRating: data.amenitiesRating,
+        punctualityRating: data.punctualityRating,
+        comments: data.comments,
         createdAt: new Date()
       };
 

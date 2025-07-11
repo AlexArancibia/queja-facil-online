@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import { DISCIPLINES, type Instructor } from '@/types/instructor';
 
 interface InstructorFormData {
   name: string;
-  discipline: string;
+  discipline: 'siclo' | 'barre' | 'yoga' | 'ejercito';
   storeId: string;
 }
 
@@ -57,8 +56,9 @@ const InstructorManagement = () => {
       } else {
         const newInstructor: Instructor = {
           id: `instructor-${Date.now()}`,
-          ...data,
-          discipline: data.discipline as any,
+          name: data.name,
+          discipline: data.discipline,
+          storeId: data.storeId,
           createdAt: new Date(),
           isActive: true
         };
@@ -174,7 +174,7 @@ const InstructorManagement = () => {
 
               <div className="space-y-2">
                 <Label>Disciplina</Label>
-                <Select onValueChange={(value) => setValue('discipline', value)}>
+                <Select onValueChange={(value) => setValue('discipline', value as 'siclo' | 'barre' | 'yoga' | 'ejercito')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona una disciplina" />
                   </SelectTrigger>
