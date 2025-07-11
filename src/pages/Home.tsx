@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageSquareText, Star, Users, ShieldCheck, Building2, Sparkles } from 'lucide-react';
+import { MessageSquareText, Star, LogIn, Building2, Sparkles } from 'lucide-react';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -22,24 +22,14 @@ const Home = () => {
                 <p className="text-xs text-siclo-dark/60 font-medium">Sistema Integral de Gestión</p>
               </div>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Managers
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-blue/30 text-siclo-blue hover:bg-siclo-blue hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                Admin
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/login')}
+              className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Iniciar Sesión
+            </Button>
           </div>
         </div>
       </header>

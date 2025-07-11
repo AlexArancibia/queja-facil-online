@@ -1,9 +1,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RatingForm from '@/components/RatingForm';
-import RatingSearch from '@/components/RatingSearch';
-import { Star, Search, Users, ShieldCheck, Building2, ArrowLeft } from 'lucide-react';
+import { Star, ArrowLeft, LogIn, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,30 +30,20 @@ const Ratings = () => {
                 <p className="text-xs text-siclo-dark/60 font-medium">Calificación de Instructores</p>
               </div>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Managers
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className="border-siclo-blue/30 text-siclo-blue hover:bg-siclo-blue hover:text-white transition-all duration-300 shadow-sm"
-              >
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                Admin
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/login')}
+              className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Iniciar Sesión
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-siclo-dark mb-4">
             Califica tu experiencia
@@ -65,52 +53,17 @@ const Ratings = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="nueva-calificacion" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-white/80 backdrop-blur-sm shadow-sm border border-siclo-light/50 h-14">
-            <TabsTrigger 
-              value="nueva-calificacion" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-300"
-            >
-              <Star className="h-5 w-5 mr-2" />
-              Calificar Instructor
-            </TabsTrigger>
-            <TabsTrigger 
-              value="buscar-calificacion" 
-              className="flex items-center text-base font-medium data-[state=active]:bg-siclo-blue data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-300"
-            >
-              <Search className="h-5 w-5 mr-2" />
-              Consultar Calificación
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="nueva-calificacion">
-            <Card className="siclo-card border-0 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-siclo-light/50">
-                <CardTitle className="text-siclo-dark text-xl">Calificación de Instructor</CardTitle>
-                <CardDescription className="text-siclo-dark/60">
-                  Evalúa todos los aspectos de tu clase. Tu retroalimentación es importante para nosotros.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-8">
-                <RatingForm />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="buscar-calificacion">
-            <Card className="siclo-card border-0 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-siclo-blue/5 to-siclo-green/5 border-b border-siclo-light/50">
-                <CardTitle className="text-siclo-dark text-xl">Consultar Calificación</CardTitle>
-                <CardDescription className="text-siclo-dark/60">
-                  Busca tus calificaciones anteriores ingresando tu información.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-8">
-                <RatingSearch />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <Card className="siclo-card border-0 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-siclo-light/50">
+            <CardTitle className="text-siclo-dark text-xl">Calificación de Instructor</CardTitle>
+            <CardDescription className="text-siclo-dark/60">
+              Evalúa todos los aspectos de tu clase. Tu retroalimentación es importante para nosotros.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-8">
+            <RatingForm />
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
