@@ -12,6 +12,7 @@ import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complain
 import AddManagerForm from '@/components/AddManagerForm';
 import StoreManagement from '@/components/StoreManagement';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import InstructorManagement from '@/components/InstructorManagement';
 import { 
   MessageSquareText, 
   LogOut, 
@@ -29,7 +30,8 @@ import {
   Building2,
   Shield,
   PieChart,
-  Activity
+  Activity,
+  GraduationCap
 } from 'lucide-react';
 
 const AdminPanel = () => {
@@ -138,10 +140,10 @@ const AdminPanel = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
+          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
             <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <BarChart3 className="h-4 w-4 mr-2" />
-              Resumen
+              Dashboard
             </TabsTrigger>
             <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <MessageSquareText className="h-4 w-4 mr-2" />
@@ -150,6 +152,10 @@ const AdminPanel = () => {
             <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Users className="h-4 w-4 mr-2" />
               Managers
+            </TabsTrigger>
+            <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Instructores
             </TabsTrigger>
             <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Building2 className="h-4 w-4 mr-2" />
@@ -403,6 +409,10 @@ const AdminPanel = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="instructors" className="space-y-6">
+            <InstructorManagement />
           </TabsContent>
 
           <TabsContent value="stores" className="space-y-6">
