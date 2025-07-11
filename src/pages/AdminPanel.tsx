@@ -39,6 +39,9 @@ import {
   Star
 } from 'lucide-react';
 
+// Create a combined type for unified activity view
+type CombinedActivity = (Complaint & { type: 'complaint'; date: Date }) | (Rating & { type: 'rating'; date: Date; store: string; fullName: string });
+
 const AdminPanel = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -93,7 +96,7 @@ const AdminPanel = () => {
   };
 
   // Combine complaints and ratings for unified view
-  const combinedData = [
+  const combinedData: CombinedActivity[] = [
     ...complaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
@@ -111,7 +114,7 @@ const AdminPanel = () => {
   const filteredData = combinedData.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
     if (filterStore !== 'all' && item.store !== filterStore) return false;
-    if (filterStatus !== 'all' && item.type === 'complaint' && (item as Complaint).status !== filterStatus) return false;
+    if (filterStatus !== 'all' && item.type === 'complaint' && item.status !== filterStatus) return false;
     return true;
   }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -278,13 +281,13 @@ const AdminPanel = () => {
                               {item.type === 'complaint' ? 'Queja' : 'Calificación'}
                             </Badge>
                             {item.type === 'complaint' && (
-                              <Badge className={`${getStatusColor((item as Complaint).status)} border`}>
-                                {(item as Complaint).status}
+                              <Badge className={`${getStatusColor(item.status)} border`}>
+                                {item.status}
                               </Badge>
                             )}
                             {item.type === 'rating' && (
                               <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                                ⭐ {((item as Rating).npsScore).toFixed(1)}
+                                ⭐ {item.npsScore.toFixed(1)}
                               </Badge>
                             )}
                           </div>
@@ -298,7 +301,7 @@ const AdminPanel = () => {
                           <div className="flex items-center">
                             <User className="h-4 w-4 mr-2 text-siclo-green" />
                             <span className="font-medium text-siclo-dark">
-                              {item.type === 'complaint' ? (item as Complaint).fullName : (item as Rating).instructorName}
+                              {item.type === 'complaint' ? item.fullName : item.instructorName}
                             </span>
                           </div>
                           <div className="flex items-center">
@@ -307,24 +310,24 @@ const AdminPanel = () => {
                           </div>
                           <div className="text-siclo-dark/70">
                             {item.type === 'complaint' 
-                              ? (item as Complaint).observationType
-                              : `Instructor: ${(item as Rating).instructorName}`
+                              ? item.observationType
+                              : `Instructor: ${item.instructorName}`
                             }
                           </div>
                         </div>
                         
                         {item.type === 'complaint' && (
                           <p className="text-sm text-siclo-dark/70 mt-2 line-clamp-2">
-                            {(item as Complaint).detail}
+                            {item.detail}
                           </p>
                         )}
                         
                         {item.type === 'rating' && (
                           <div className="mt-2 flex items-center space-x-4 text-xs text-siclo-dark/70">
-                            <span>NPS: {(item as Rating).npsScore}</span>
-                            <span>Instructor: {(item as Rating).instructorRating}</span>
-                            <span>Limpieza: {(item as Rating).cleanlinessRating}</span>
-                            <span>Audio: {(item as Rating).audioRating}</span>
+                            <span>NPS: {item.npsScore}</span>
+                            <span>Instructor: {item.instructorRating}</span>
+                            <span>Limpieza: {item.cleanlinessRating}</span>
+                            <span>Audio: {item.audioRating}</span>
                           </div>
                         )}
                       </CardContent>

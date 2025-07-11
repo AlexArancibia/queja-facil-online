@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,9 @@ import {
   Star,
   Activity
 } from 'lucide-react';
+
+// Create a combined type for unified activity view
+type CombinedActivity = (Complaint & { type: 'complaint'; date: Date }) | (Rating & { type: 'rating'; date: Date; store: string; fullName: string });
 
 const ManagerPanel = () => {
   const { user, logout } = useAuth();
@@ -156,7 +160,7 @@ const ManagerPanel = () => {
   };
 
   // Combine complaints and ratings for unified view
-  const combinedData = [
+  const combinedData: CombinedActivity[] = [
     ...complaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
@@ -173,7 +177,7 @@ const ManagerPanel = () => {
 
   const filteredData = combinedData.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
-    if (filterStatus !== 'all' && item.type === 'complaint' && (item as Complaint).status !== filterStatus) return false;
+    if (filterStatus !== 'all' && item.type === 'complaint' && item.status !== filterStatus) return false;
     return true;
   }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -266,7 +270,7 @@ const ManagerPanel = () => {
                   }`}
                   onClick={() => {
                     if (item.type === 'complaint') {
-                      setSelectedComplaint(item as Complaint);
+                      setSelectedComplaint(item);
                     }
                   }}
                 >
@@ -277,14 +281,14 @@ const ManagerPanel = () => {
                           {item.type === 'complaint' ? 'Queja' : 'Calificación'}
                         </Badge>
                         {item.type === 'complaint' && (
-                          <Badge className={`${getStatusColor((item as Complaint).status)} border`}>
-                            {(item as Complaint).status}
+                          <Badge className={`${getStatusColor(item.status)} border`}>
+                            {item.status}
                           </Badge>
                         )}
                         {item.type === 'rating' && (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-200">
                             <Star className="h-3 w-3 mr-1" />
-                            {((item as Rating).npsScore).toFixed(1)}
+                            {item.npsScore.toFixed(1)}
                           </Badge>
                         )}
                       </div>
@@ -298,7 +302,7 @@ const ManagerPanel = () => {
                       <div className="flex items-center text-sm">
                         <User className="h-4 w-4 mr-2 text-siclo-green" />
                         <span className="font-medium text-siclo-dark">
-                          {item.type === 'complaint' ? (item as Complaint).fullName : (item as Rating).instructorName}
+                          {item.type === 'complaint' ? item.fullName : item.instructorName}
                         </span>
                       </div>
                       <div className="flex items-center text-sm">
@@ -307,14 +311,14 @@ const ManagerPanel = () => {
                       </div>
                       {item.type === 'complaint' && (
                         <p className="text-sm text-siclo-dark/70 truncate">
-                          {(item as Complaint).observationType}: {(item as Complaint).detail}
+                          {item.observationType}: {item.detail}
                         </p>
                       )}
                       {item.type === 'rating' && (
                         <div className="flex items-center space-x-3 text-xs text-siclo-dark/70">
-                          <span>NPS: {(item as Rating).npsScore}</span>
-                          <span>Instructor: {(item as Rating).instructorRating}</span>
-                          <span>Limpieza: {(item as Rating).cleanlinessRating}</span>
+                          <span>NPS: {item.npsScore}</span>
+                          <span>Instructor: {item.instructorRating}</span>
+                          <span>Limpieza: {item.cleanlinessRating}</span>
                         </div>
                       )}
                     </div>
