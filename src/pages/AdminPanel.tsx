@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,10 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complaint';
+import { type Rating } from '@/types/instructor';
 import AddManagerForm from '@/components/AddManagerForm';
 import StoreManagement from '@/components/StoreManagement';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import InstructorManagement from '@/components/InstructorManagement';
+import DashboardStats from '@/components/DashboardStats';
+import RecentActivity from '@/components/RecentActivity';
 import { 
   MessageSquareText, 
   LogOut, 
@@ -31,7 +35,8 @@ import {
   Shield,
   PieChart,
   Activity,
-  GraduationCap
+  GraduationCap,
+  Star
 } from 'lucide-react';
 
 const AdminPanel = () => {
@@ -39,9 +44,11 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
+  const [filterType, setFilterType] = useState('all');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -55,6 +62,10 @@ const AdminPanel = () => {
     // Load complaints
     const allComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
     setComplaints(allComplaints);
+
+    // Load ratings
+    const allRatings: Rating[] = JSON.parse(localStorage.getItem('ratings') || '[]');
+    setRatings(allRatings);
 
     // Load managers
     const allManagers = JSON.parse(localStorage.getItem('managers') || '[]');
@@ -76,37 +87,55 @@ const AdminPanel = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'Alta':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'Media':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'Baja':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   const getStoreName = (storeId: string) => {
     const store = MOCK_STORES.find(s => s.id === storeId);
     return store ? store.name : storeId;
   };
 
-  const filteredComplaints = complaints.filter(complaint => {
-    if (filterStatus !== 'all' && complaint.status !== filterStatus) return false;
-    if (filterStore !== 'all' && complaint.store !== filterStore) return false;
+  // Combine complaints and ratings for unified view
+  const combinedData = [
+    ...complaints.map(complaint => ({
+      ...complaint,
+      type: 'complaint' as const,
+      date: new Date(complaint.createdAt)
+    })),
+    ...ratings.map(rating => ({
+      ...rating,
+      type: 'rating' as const,
+      date: new Date(rating.createdAt),
+      store: rating.storeId,
+      fullName: `Calificación de ${rating.instructorName}`
+    }))
+  ];
+
+  const filteredData = combinedData.filter(item => {
+    if (filterType !== 'all' && item.type !== filterType) return false;
+    if (filterStore !== 'all' && item.store !== filterStore) return false;
+    if (filterStatus !== 'all' && item.type === 'complaint' && (item as Complaint).status !== filterStatus) return false;
     return true;
-  });
+  }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const getQuickStats = () => {
-    const total = complaints.length;
-    const pending = complaints.filter(c => c.status === 'Pendiente').length;
-    const resolved = complaints.filter(c => c.status === 'Resuelta').length;
+    const totalComplaints = complaints.length;
+    const totalRatings = ratings.length;
+    const pendingComplaints = complaints.filter(c => c.status === 'Pendiente').length;
+    const resolvedComplaints = complaints.filter(c => c.status === 'Resuelta').length;
+    const averageRating = ratings.length > 0 
+      ? ratings.reduce((acc, rating) => {
+          const avgRating = (
+            rating.instructorRating +
+            rating.cleanlinessRating +
+            rating.audioRating +
+            rating.attentionQualityRating +
+            rating.amenitiesRating +
+            rating.punctualityRating
+          ) / 6;
+          return acc + avgRating;
+        }, 0) / ratings.length
+      : 0;
     const totalManagers = managers.length;
 
-    return { total, pending, resolved, totalManagers };
+    return { totalComplaints, totalRatings, pendingComplaints, resolvedComplaints, averageRating, totalManagers };
   };
 
   const quickStats = getQuickStats();
@@ -145,9 +174,9 @@ const AdminPanel = () => {
               <BarChart3 className="h-4 w-4 mr-2" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <MessageSquareText className="h-4 w-4 mr-2" />
-              Quejas
+            <TabsTrigger value="activity" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <Activity className="h-4 w-4 mr-2" />
+              Actividad
             </TabsTrigger>
             <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Users className="h-4 w-4 mr-2" />
@@ -168,95 +197,11 @@ const AdminPanel = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-siclo-dark/70">Total Quejas</p>
-                      <p className="text-3xl font-bold text-siclo-dark">{quickStats.total}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-siclo-blue to-siclo-green rounded-xl flex items-center justify-center shadow-lg">
-                      <MessageSquareText className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-siclo-dark/70">Managers</p>
-                      <p className="text-3xl font-bold text-siclo-dark">{quickStats.totalManagers}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <Users className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-siclo-dark/70">Resueltas</p>
-                      <p className="text-3xl font-bold text-emerald-600">{quickStats.resolved}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                      <CheckCircle className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="siclo-card hover:shadow-xl transition-all duration-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-siclo-dark/70">Pendientes</p>
-                      <p className="text-3xl font-bold text-amber-600">{quickStats.pending}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg">
-                      <Clock className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Activity Summary */}
-            <Card className="siclo-card">
-              <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
-                <CardTitle className="text-siclo-dark flex items-center">
-                  <Activity className="h-5 w-5 mr-2" />
-                  Resumen de Actividad
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-siclo-blue">{MOCK_STORES.length}</p>
-                    <p className="text-sm text-siclo-dark/70">Locales Activos</p>
-                  </div>
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-siclo-green">{quickStats.totalManagers}</p>
-                    <p className="text-sm text-siclo-dark/70">Managers Registrados</p>
-                  </div>
-                  <div className="text-center p-4 bg-siclo-light/30 rounded-xl">
-                    <p className="text-2xl font-bold text-amber-600">
-                      {quickStats.total > 0 ? ((quickStats.resolved / quickStats.total) * 100).toFixed(1) : 0}%
-                    </p>
-                    <p className="text-sm text-siclo-dark/70">Tasa de Resolución</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <DashboardStats complaints={complaints} ratings={ratings} />
+            <RecentActivity complaints={complaints} ratings={ratings} />
           </TabsContent>
 
-          <TabsContent value="complaints" className="space-y-6">
+          <TabsContent value="activity" className="space-y-6">
             {/* Filters */}
             <Card className="siclo-card">
               <CardHeader>
@@ -266,11 +211,24 @@ const AdminPanel = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-siclo-dark font-medium">Estado</Label>
+                    <Label className="text-siclo-dark font-medium">Tipo</Label>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="complaint">Quejas</SelectItem>
+                        <SelectItem value="rating">Calificaciones</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-siclo-dark font-medium">Estado (Quejas)</Label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -285,7 +243,7 @@ const AdminPanel = () => {
                   <div>
                     <Label className="text-siclo-dark font-medium">Local</Label>
                     <Select value={filterStore} onValueChange={setFilterStore}>
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -302,58 +260,81 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
 
-            {/* Complaints List */}
+            {/* Combined Activity List */}
             <Card className="siclo-card">
               <CardHeader>
                 <CardTitle className="text-siclo-dark">
-                  Quejas ({filteredComplaints.length})
+                  Actividad Reciente ({filteredData.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {filteredComplaints.map((complaint) => (
-                    <Card key={complaint.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
+                  {filteredData.map((item) => (
+                    <Card key={item.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
                       <CardContent className="pt-4">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex gap-2">
-                            <Badge className={`${getStatusColor(complaint.status)} border`}>
-                              {complaint.status}
+                            <Badge className={`${item.type === 'complaint' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border`}>
+                              {item.type === 'complaint' ? 'Queja' : 'Calificación'}
                             </Badge>
-                            <Badge className={`${getPriorityColor(complaint.priority)} border`}>
-                              {complaint.priority}
-                            </Badge>
+                            {item.type === 'complaint' && (
+                              <Badge className={`${getStatusColor((item as Complaint).status)} border`}>
+                                {(item as Complaint).status}
+                              </Badge>
+                            )}
+                            {item.type === 'rating' && (
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                                ⭐ {((item as Rating).npsScore).toFixed(1)}
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-xs text-siclo-dark/60 flex items-center">
                             <Calendar className="h-3 w-3 mr-1" />
-                            {new Date(complaint.createdAt).toLocaleDateString('es-ES')}
+                            {item.date.toLocaleDateString('es-ES')}
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div className="flex items-center">
                             <User className="h-4 w-4 mr-2 text-siclo-green" />
-                            <span className="font-medium text-siclo-dark">{complaint.fullName}</span>
+                            <span className="font-medium text-siclo-dark">
+                              {item.type === 'complaint' ? (item as Complaint).fullName : (item as Rating).instructorName}
+                            </span>
                           </div>
                           <div className="flex items-center">
                             <Store className="h-4 w-4 mr-2 text-siclo-blue" />
-                            <span className="text-siclo-dark/70">{getStoreName(complaint.store)}</span>
+                            <span className="text-siclo-dark/70">{getStoreName(item.store)}</span>
                           </div>
                           <div className="text-siclo-dark/70">
-                            {complaint.observationType}
+                            {item.type === 'complaint' 
+                              ? (item as Complaint).observationType
+                              : `Instructor: ${(item as Rating).instructorName}`
+                            }
                           </div>
                         </div>
                         
-                        <p className="text-sm text-siclo-dark/70 mt-2 line-clamp-2">
-                          {complaint.detail}
-                        </p>
+                        {item.type === 'complaint' && (
+                          <p className="text-sm text-siclo-dark/70 mt-2 line-clamp-2">
+                            {(item as Complaint).detail}
+                          </p>
+                        )}
+                        
+                        {item.type === 'rating' && (
+                          <div className="mt-2 flex items-center space-x-4 text-xs text-siclo-dark/70">
+                            <span>NPS: {(item as Rating).npsScore}</span>
+                            <span>Instructor: {(item as Rating).instructorRating}</span>
+                            <span>Limpieza: {(item as Rating).cleanlinessRating}</span>
+                            <span>Audio: {(item as Rating).audioRating}</span>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
                   
-                  {filteredComplaints.length === 0 && (
+                  {filteredData.length === 0 && (
                     <div className="text-center text-siclo-dark/60 py-12">
-                      <MessageSquareText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No hay quejas que coincidan con los filtros</p>
+                      <Activity className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg">No hay actividad que coincida con los filtros</p>
                     </div>
                   )}
                 </div>
@@ -363,10 +344,7 @@ const AdminPanel = () => {
 
           <TabsContent value="managers" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Add Manager Form */}
               <AddManagerForm onManagerAdded={loadData} />
-
-              {/* Existing Managers */}
               <Card className="siclo-card">
                 <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
                   <CardTitle className="text-siclo-dark flex items-center">

@@ -112,24 +112,23 @@ const RatingForm = () => {
     fieldName: keyof typeof ratings;
     hasError?: boolean;
   }) => (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <Label className={`text-siclo-dark font-medium ${hasError ? 'text-red-600' : ''}`}>
+        <Label className={`text-sm font-medium ${hasError ? 'text-red-500' : 'text-gray-700'}`}>
           {label}
         </Label>
         <div className="flex items-center space-x-2">
-          {value > 0 && (
+          {value > 0 ? (
             <div className="flex items-center text-amber-600">
-              <Star className="h-4 w-4 mr-1 fill-current" />
-              <span className="text-lg font-bold">{value}</span>
+              <Star className="h-3 w-3 mr-1 fill-current" />
+              <span className="text-sm font-medium">{value}</span>
             </div>
-          )}
-          {value === 0 && (
-            <span className="text-sm text-gray-400">Sin calificar</span>
+          ) : (
+            <span className="text-xs text-gray-400">Sin calificar</span>
           )}
         </div>
       </div>
-      <div className="grid grid-cols-10 gap-2">
+      <div className="grid grid-cols-10 gap-1">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
           <button
             key={score}
@@ -139,12 +138,12 @@ const RatingForm = () => {
               setValue(fieldName, score);
               setRatings(prev => ({ ...prev, [fieldName]: score }));
             }}
-            className={`aspect-square rounded-lg text-sm font-medium transition-all duration-200 border-2 ${
+            className={`h-8 rounded text-xs font-medium transition-all duration-200 border ${
               score <= value
-                ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md border-amber-400'
+                ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm'
                 : hasError
                 ? 'bg-red-50 text-red-400 hover:bg-red-100 border-red-200'
-                : 'bg-gray-50 text-gray-400 hover:bg-gray-100 border-gray-200'
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border-gray-200'
             }`}
           >
             {score}
@@ -152,26 +151,26 @@ const RatingForm = () => {
         ))}
       </div>
       {hasError && (
-        <p className="text-red-500 text-sm">Debes calificar al menos con 1 punto</p>
+        <p className="text-red-500 text-xs">Debes calificar al menos con 1 punto</p>
       )}
     </div>
   );
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Store and Instructor Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-siclo-dark font-medium flex items-center">
+          <Label className="text-sm font-medium flex items-center text-gray-700">
             <Building2 className="h-4 w-4 mr-2 text-siclo-green" />
             Local
           </Label>
           <Select onValueChange={(value) => {
             setValue('storeId', value);
             setSelectedStore(value);
-            setValue('instructorId', ''); // Reset instructor when store changes
+            setValue('instructorId', '');
           }}>
-            <SelectTrigger className="border-siclo-light/50 focus:border-siclo-green">
+            <SelectTrigger className="border-gray-200 focus:border-siclo-green">
               <SelectValue placeholder="Selecciona el local" />
             </SelectTrigger>
             <SelectContent>
@@ -182,11 +181,11 @@ const RatingForm = () => {
               ))}
             </SelectContent>
           </Select>
-          {errors.storeId && <p className="text-red-500 text-sm">{errors.storeId.message}</p>}
+          {errors.storeId && <p className="text-red-500 text-xs">{errors.storeId.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-siclo-dark font-medium flex items-center">
+          <Label className="text-sm font-medium flex items-center text-gray-700">
             <User className="h-4 w-4 mr-2 text-siclo-blue" />
             Instructor
           </Label>
@@ -194,7 +193,7 @@ const RatingForm = () => {
             onValueChange={(value) => setValue('instructorId', value)}
             disabled={!selectedStore}
           >
-            <SelectTrigger className="border-siclo-light/50 focus:border-siclo-green">
+            <SelectTrigger className="border-gray-200 focus:border-siclo-green">
               <SelectValue placeholder="Selecciona el instructor" />
             </SelectTrigger>
             <SelectContent>
@@ -205,66 +204,66 @@ const RatingForm = () => {
               ))}
             </SelectContent>
           </Select>
-          {errors.instructorId && <p className="text-red-500 text-sm">{errors.instructorId.message}</p>}
+          {errors.instructorId && <p className="text-red-500 text-xs">{errors.instructorId.message}</p>}
         </div>
       </div>
 
       {/* Date and Schedule */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-siclo-dark font-medium flex items-center">
+          <Label className="text-sm font-medium flex items-center text-gray-700">
             <Calendar className="h-4 w-4 mr-2 text-siclo-green" />
             Fecha de la clase
           </Label>
           <Input
             type="date"
             {...register('date')}
-            className="border-siclo-light/50 focus:border-siclo-green"
+            className="border-gray-200 focus:border-siclo-green"
           />
-          {errors.date && <p className="text-red-500 text-sm">{errors.date.message}</p>}
+          {errors.date && <p className="text-red-500 text-xs">{errors.date.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-siclo-dark font-medium flex items-center">
+          <Label className="text-sm font-medium flex items-center text-gray-700">
             <Clock className="h-4 w-4 mr-2 text-siclo-blue" />
             Horario de la clase
           </Label>
           <TimePicker
             onValueChange={(value) => setValue('schedule', value)}
           />
-          {errors.schedule && <p className="text-red-500 text-sm">{errors.schedule.message}</p>}
+          {errors.schedule && <p className="text-red-500 text-xs">{errors.schedule.message}</p>}
         </div>
       </div>
 
       {/* NPS Score */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardContent className="pt-6">
+      <Card className="bg-blue-50/50 border-blue-100">
+        <CardContent className="pt-4">
           <RatingSlider
-            label="1. Calificación de cliente NPS (1-10)"
+            label="1. ¿Recomendarías esta clase? (NPS 1-10)"
             value={ratings.npsScore}
             onChange={(value) => {}}
             fieldName="npsScore"
             hasError={!!errors.npsScore}
           />
-          <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center p-2 bg-emerald-100 rounded-lg">
-              <span className="font-medium text-emerald-800">Excelente: 9-10</span>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <div className="text-center p-2 bg-emerald-100/50 rounded">
+              <span className="text-emerald-700">Promotores: 9-10</span>
             </div>
-            <div className="text-center p-2 bg-amber-100 rounded-lg">
-              <span className="font-medium text-amber-800">Neutro: 7-8</span>
+            <div className="text-center p-2 bg-amber-100/50 rounded">
+              <span className="text-amber-700">Pasivos: 7-8</span>
             </div>
-            <div className="text-center p-2 bg-red-100 rounded-lg">
-              <span className="font-medium text-red-800">Mejorar: 1-6</span>
+            <div className="text-center p-2 bg-red-100/50 rounded">
+              <span className="text-red-700">Detractores: 1-6</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Observaciones */}
-      <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
-        <CardContent className="pt-6">
-          <h3 className="text-lg font-bold text-siclo-dark mb-6">2. Evaluación detallada</h3>
-          <div className="space-y-6">
+      {/* Detailed Ratings */}
+      <Card className="bg-amber-50/30 border-amber-100">
+        <CardContent className="pt-4">
+          <h3 className="text-base font-semibold text-gray-800 mb-4">2. Evaluación detallada</h3>
+          <div className="space-y-4">
             <RatingSlider
               label="Instructor"
               value={ratings.instructorRating}
@@ -318,18 +317,18 @@ const RatingForm = () => {
 
       {/* Comments */}
       <div className="space-y-2">
-        <Label className="text-siclo-dark font-medium">Comentarios adicionales (opcional)</Label>
+        <Label className="text-sm font-medium text-gray-700">Comentarios adicionales (opcional)</Label>
         <Textarea
           placeholder="Comparte cualquier comentario adicional sobre tu experiencia..."
           {...register('comments')}
-          className="border-siclo-light/50 focus:border-siclo-green min-h-[100px]"
+          className="border-gray-200 focus:border-siclo-green min-h-[80px] text-sm"
         />
       </div>
 
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full siclo-button h-12 text-lg font-medium"
+        className="w-full siclo-button h-11 text-base font-medium"
       >
         {isSubmitting ? 'Enviando calificación...' : 'Enviar Calificación'}
       </Button>
