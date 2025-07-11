@@ -32,8 +32,10 @@ import {
   Activity
 } from 'lucide-react';
 
-// Create a combined type for unified activity view
-type CombinedActivity = (Complaint & { type: 'complaint'; date: Date }) | (Rating & { type: 'rating'; date: Date; store: string; fullName: string });
+// Create a proper combined type for unified activity view
+type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
+type RatingActivity = Omit<Rating, 'date'> & { type: 'rating'; activityDate: Date; store: string; fullName: string };
+type CombinedActivity = ComplaintActivity | RatingActivity;
 
 const ManagerPanel = () => {
   const { user, logout } = useAuth();
@@ -164,12 +166,12 @@ const ManagerPanel = () => {
     ...complaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
-      date: new Date(complaint.createdAt)
+      activityDate: new Date(complaint.createdAt)
     })),
     ...ratings.map(rating => ({
       ...rating,
       type: 'rating' as const,
-      date: new Date(rating.createdAt),
+      activityDate: new Date(rating.createdAt),
       store: rating.storeId,
       fullName: `Calificación de ${rating.instructorName}`
     }))
@@ -179,7 +181,7 @@ const ManagerPanel = () => {
     if (filterType !== 'all' && item.type !== filterType) return false;
     if (filterStatus !== 'all' && item.type === 'complaint' && item.status !== filterStatus) return false;
     return true;
-  }).sort((a, b) => b.date.getTime() - a.date.getTime());
+  }).sort((a, b) => b.activityDate.getTime() - a.activityDate.getTime());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light to-white">
@@ -294,7 +296,7 @@ const ManagerPanel = () => {
                       </div>
                       <div className="text-xs text-siclo-dark/60 flex items-center">
                         <Calendar className="h-3 w-3 mr-1" />
-                        {item.date.toLocaleDateString('es-ES')}
+                        {item.activityDate.toLocaleDateString('es-ES')}
                       </div>
                     </div>
                     
