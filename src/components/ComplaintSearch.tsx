@@ -5,36 +5,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Search, FileText, Calendar, AlertCircle } from 'lucide-react';
 import { type Complaint } from '@/types/complaint';
 import { MOCK_STORES } from '@/types/complaint';
+import { useComplaintsStore } from '@/stores/complaintsStore';
 
 const ComplaintSearch = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Complaint[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const { searchComplaints, loading } = useComplaintsStore();
 
   const handleSearch = async () => {
-    setIsSearching(true);
     setHasSearched(true);
     
     try {
-      // Get complaints from localStorage
-      const existingComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
+      const [email, complaintId] = searchTerm.includes('@') 
+        ? [searchTerm, '']
+        : ['', searchTerm];
       
-      // Search by ID or email
-      const results = existingComplaints.filter(complaint => 
-        complaint.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        complaint.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      
+      const results = await searchComplaints(email || searchTerm, complaintId);
       setSearchResults(results);
     } catch (error) {
       console.error('Error searching:', error);
       setSearchResults([]);
-    } finally {
-      setIsSearching(false);
     }
   };
 
@@ -72,32 +67,59 @@ const ComplaintSearch = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1">
-          <Label htmlFor="search">ID de Queja o Correo Electrónico</Label>
+          <Label htmlFor="search" className="text-siclo-dark font-medium">ID de Queja o Correo Electrónico</Label>
           <Input
             id="search"
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Ej: QJ-1234567890-ABCDE o tu@email.com"
-            className="mt-1"
+            placeholder="Ej: SICLO-123... o tu@email.com"
+            className="mt-1 border-siclo-light focus:border-siclo-green"
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           />
         </div>
         <div className="flex items-end">
-          <Button onClick={handleSearch} disabled={!searchTerm.trim() || isSearching}>
+          <Button 
+            onClick={handleSearch} 
+            disabled={!searchTerm.trim() || loading}
+            className="w-full sm:w-auto siclo-button"
+          >
             <Search className="w-4 h-4 mr-2" />
-            {isSearching ? 'Buscando...' : 'Buscar'}
+            {loading ? 'Buscando...' : 'Buscar'}
           </Button>
         </div>
       </div>
 
-      {hasSearched && (
+      {loading && hasSearched && (
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <Card key={i} className="siclo-card">
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <div className="flex gap-2 mt-2">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-6 w-24" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {hasSearched && !loading && (
         <div className="space-y-4">
           {searchResults.length === 0 ? (
-            <Card className="bg-gray-50">
+            <Card className="siclo-card bg-gray-50/50">
               <CardContent className="pt-6">
                 <div className="text-center">
                   <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -105,7 +127,7 @@ const ComplaintSearch = () => {
                     No se encontraron quejas
                   </h3>
                   <p className="text-gray-600">
-                    No hay quejas registradas con el ID o correo electrónico proporcionado.
+                    No hay quejas registradas con el criterio proporcionado.
                   </p>
                 </div>
               </CardContent>

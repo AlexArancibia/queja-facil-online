@@ -8,10 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { type Complaint, MOCK_STORES } from '@/types/complaint';
-import { type Rating } from '@/types/instructor';
+import { MOCK_STORES } from '@/types/complaint';
 import DashboardStats from '@/components/DashboardStats';
+import ManagerStatsCharts from '@/components/ManagerStatsCharts';
+import ManagersList from '@/components/ManagersList';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { useComplaintsStore } from '@/stores/complaintsStore';
+import { useRatingsStore } from '@/stores/ratingsStore';
 import { 
   Pagination,
   PaginationContent,
@@ -43,18 +48,18 @@ import {
 } from 'lucide-react';
 
 // Create a proper combined type for unified activity view
-type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
-type RatingActivity = Omit<Rating, 'date'> & { type: 'rating'; activityDate: Date; store: string; fullName: string };
+type ComplaintActivity = any & { type: 'complaint'; activityDate: Date };
+type RatingActivity = any & { type: 'rating'; activityDate: Date; store: string; fullName: string };
 type CombinedActivity = ComplaintActivity | RatingActivity;
 
 const ManagerPanel = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [ratings, setRatings] = useState<Rating[]>([]);
-  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
-  const [selectedRating, setSelectedRating] = useState<Rating | null>(null);
+  const { complaints, loading: complaintsLoading, fetchComplaints, updateComplaint } = useComplaintsStore();
+  const { ratings, loading: ratingsLoading, fetchRatings } = useRatingsStore();
+  const [selectedComplaint, setSelectedComplaint] = useState<any | null>(null);
+  const [selectedRating, setSelectedRating] = useState<any | null>(null);
   const [newStatus, setNewStatus] = useState('');
   const [resolution, setResolution] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -62,7 +67,10 @@ const ManagerPanel = () => {
   const [resolutionFiles, setResolutionFiles] = useState<File[]>([]);
   const [resolutionPreviews, setResolutionPreviews] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const itemsPerPage = 10;
+  const loading = complaintsLoading || ratingsLoading;
 
   useEffect(() => {
     if (!user || user.role !== 'manager') {
@@ -73,21 +81,18 @@ const ManagerPanel = () => {
   }, [user, navigate]);
 
   const loadData = () => {
-    const allComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
-    const allRatings: Rating[] = JSON.parse(localStorage.getItem('ratings') || '[]');
-    
-    // Filter for manager's stores
-    const managerComplaints = allComplaints.filter(complaint => 
-      user?.stores?.includes(complaint.store)
-    );
-    
-    const managerRatings = allRatings.filter(rating => 
-      user?.stores?.includes(rating.storeId)
-    );
-    
-    setComplaints(managerComplaints);
-    setRatings(managerRatings);
+    fetchComplaints();
+    fetchRatings();
   };
+
+  // Filter data for manager's stores
+  const managerComplaints = complaints.filter(complaint => 
+    user?.stores?.includes(complaint.store)
+  );
+  
+  const managerRatings = ratings.filter(rating => 
+    user?.stores?.includes(rating.storeId)
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -142,46 +147,44 @@ const ManagerPanel = () => {
     setResolutionPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleStatusUpdate = () => {
+  const handleStatusUpdate = async () => {
     if (!selectedComplaint || !newStatus) return;
 
-    const allComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
-    const updatedComplaints = allComplaints.map(complaint => {
-      if (complaint.id === selectedComplaint.id) {
-        return {
-          ...complaint,
-          status: newStatus as any,
-          resolution: resolution || complaint.resolution,
-          managerComments: resolution || complaint.managerComments,
-          resolutionAttachments: resolutionFiles.map(f => f.name),
-          updatedAt: new Date()
-        };
-      }
-      return complaint;
-    });
+    try {
+      await updateComplaint(selectedComplaint.id, {
+        status: newStatus as any,
+        resolution: resolution || selectedComplaint.resolution,
+        managerComments: resolution || selectedComplaint.managerComments,
+        resolutionAttachments: resolutionFiles.map(f => f.name)
+      });
 
-    localStorage.setItem('complaints', JSON.stringify(updatedComplaints));
-    loadData();
-    setSelectedComplaint(null);
-    setNewStatus('');
-    setResolution('');
-    setResolutionFiles([]);
-    setResolutionPreviews([]);
+      setSelectedComplaint(null);
+      setNewStatus('');
+      setResolution('');
+      setResolutionFiles([]);
+      setResolutionPreviews([]);
 
-    toast({
-      title: "Estado actualizado",
-      description: "La queja ha sido actualizada exitosamente",
-    });
+      toast({
+        title: "Estado actualizado",
+        description: "La queja ha sido actualizada exitosamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la queja",
+        variant: "destructive"
+      });
+    }
   };
 
   // Combine complaints and ratings for unified view
   const combinedData: CombinedActivity[] = [
-    ...complaints.map(complaint => ({
+    ...managerComplaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
       activityDate: new Date(complaint.createdAt)
     })),
-    ...ratings.map(rating => ({
+    ...managerRatings.map(rating => ({
       ...rating,
       type: 'rating' as const,
       activityDate: new Date(rating.createdAt),
@@ -204,35 +207,36 @@ const ManagerPanel = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light to-white">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-siclo-light">
+      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-siclo-light sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 siclo-gradient rounded-lg flex items-center justify-center">
-                <Building2 className="h-6 w-6 text-white" />
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 siclo-gradient rounded-lg flex items-center justify-center">
+                <Building2 className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-siclo-dark">Panel Manager - Siclo</h1>
-                <p className="text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
+                <h1 className="text-lg sm:text-xl font-bold text-siclo-dark">Panel Manager</h1>
+                <p className="text-xs sm:text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
               </div>
             </div>
-            <Button variant="outline" onClick={logout} className="border-siclo-green text-siclo-green hover:bg-siclo-green hover:text-white">
-              <LogOut className="h-4 w-4 mr-2" />
-              Cerrar Sesión
+            <Button variant="outline" onClick={logout} className="border-siclo-green text-siclo-green hover:bg-siclo-green hover:text-white text-sm px-3 py-2">
+              <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Cerrar Sesión</span>
+              <span className="sm:hidden">Salir</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="activity" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
-            <TabsTrigger value="activity" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <Activity className="h-4 w-4 mr-2" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <Tabs defaultValue="activity" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-12 sm:h-14">
+            <TabsTrigger value="activity" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-sm">
+              <Activity className="h-4 w-4 mr-1 sm:mr-2" />
               Actividad
             </TabsTrigger>
-            <TabsTrigger value="stats" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <BarChart3 className="h-4 w-4 mr-2" />
+            <TabsTrigger value="stats" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-sm">
+              <BarChart3 className="h-4 w-4 mr-1 sm:mr-2" />
               Estadísticas
             </TabsTrigger>
           </TabsList>
@@ -292,7 +296,7 @@ const ManagerPanel = () => {
             </Card>
 
             {/* Activity List and Detail */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-siclo-dark">
@@ -303,7 +307,29 @@ const ManagerPanel = () => {
                   </Badge>
                 </div>
                 
-                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <Card key={i} className="siclo-card">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex gap-2">
+                              <Skeleton className="h-5 w-16" />
+                              <Skeleton className="h-5 w-20" />
+                            </div>
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-4 w-full" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto">
                   {paginatedData.map((item) => (
                     <Card 
                       key={item.id} 
@@ -385,7 +411,8 @@ const ManagerPanel = () => {
                       </CardContent>
                     </Card>
                   )}
-                </div>
+                  </div>
+                )}
 
                 {/* Pagination */}
                 {totalPages > 1 && (
