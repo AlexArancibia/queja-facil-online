@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_STORES, OBSERVATION_TYPES, type Complaint } from '@/types/complaint';
+import { type Complaint, MOCK_STORES, OBSERVATION_TYPES } from '@/types/complaint';
 import { type Rating } from '@/types/instructor';
 import AddManagerForm from '@/components/AddManagerForm';
 import StoreManagement from '@/components/StoreManagement';
@@ -17,9 +16,6 @@ import InstructorManagement from '@/components/InstructorManagement';
 import DashboardStats from '@/components/DashboardStats';
 import RecentActivity from '@/components/RecentActivity';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { useComplaintsStore } from '@/stores/complaintsStore';
-import { useRatingsStore } from '@/stores/ratingsStore';
-import { useManagersStore } from '@/stores/managersStore';
 import { 
   Pagination,
   PaginationContent,
@@ -61,9 +57,9 @@ const AdminPanel = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { complaints, loading: complaintsLoading, fetchComplaints } = useComplaintsStore();
-  const { ratings, loading: ratingsLoading, fetchRatings } = useRatingsStore();
-  const { managers, loading: managersLoading, fetchManagers } = useManagersStore();
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterStore, setFilterStore] = useState('all');
   const [filterType, setFilterType] = useState('all');
@@ -71,7 +67,6 @@ const AdminPanel = () => {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const itemsPerPage = 15;
-  const loading = complaintsLoading || ratingsLoading || managersLoading;
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -82,9 +77,17 @@ const AdminPanel = () => {
   }, [user, navigate]);
 
   const loadData = () => {
-    fetchComplaints();
-    fetchRatings();
-    fetchManagers();
+    // Load complaints
+    const allComplaints: Complaint[] = JSON.parse(localStorage.getItem('complaints') || '[]');
+    setComplaints(allComplaints);
+
+    // Load ratings
+    const allRatings: Rating[] = JSON.parse(localStorage.getItem('ratings') || '[]');
+    setRatings(allRatings);
+
+    // Load managers
+    const allManagers = JSON.parse(localStorage.getItem('managers') || '[]');
+    setManagers(allManagers);
   };
 
   const getStatusColor = (status: string) => {
@@ -192,58 +195,54 @@ const AdminPanel = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-siclo-light via-white to-blue-50/30">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-siclo-light/50 sticky top-0 z-50">
+      <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-siclo-light/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
-                <Shield className="h-5 w-5 sm:h-7 sm:w-7 text-white" />
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 siclo-gradient rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="h-7 w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-siclo-dark">Panel Admin</h1>
-                <p className="text-xs sm:text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
+                <h1 className="text-xl font-bold text-siclo-dark">Panel Administrador - Siclo</h1>
+                <p className="text-sm text-siclo-dark/70">Bienvenido, {user?.name}</p>
               </div>
             </div>
             <Button 
               variant="outline" 
               onClick={logout} 
-              className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm text-sm px-3 py-2"
+              className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white transition-all duration-300 shadow-sm"
             >
-              <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Cerrar Sesión</span>
-              <span className="sm:hidden">Salir</span>
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-12 sm:h-14">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm">
-              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Dashboard</span>
-              <span className="sm:hidden">Inicio</span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Dashboard
             </TabsTrigger>
-            <TabsTrigger value="activity" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm">
-              <Activity className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Actividad</span>
-              <span className="sm:hidden">Act.</span>
+            <TabsTrigger value="activity" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <Activity className="h-4 w-4 mr-2" />
+              Actividad
             </TabsTrigger>
-            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Managers</span>
-              <span className="sm:hidden">Mgrs</span>
+            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+              <Users className="h-4 w-4 mr-2" />
+              Managers
             </TabsTrigger>
-            <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm hidden sm:flex">
+            <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <GraduationCap className="h-4 w-4 mr-2" />
               Instructores
             </TabsTrigger>
-            <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm hidden sm:flex">
+            <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Building2 className="h-4 w-4 mr-2" />
               Locales
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium text-xs sm:text-sm hidden sm:flex">
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <PieChart className="h-4 w-4 mr-2" />
               Analíticas
             </TabsTrigger>
@@ -268,25 +267,8 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
 
-            {/* Enhanced Dashboard Stats with loading skeletons */}
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                {[1, 2, 3, 4].map((i) => (
-                  <Card key={i} className="siclo-card">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-8 w-16" />
-                        </div>
-                        <Skeleton className="h-8 w-8 rounded" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {/* Enhanced Dashboard Stats with icons fix */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="siclo-card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -334,8 +316,7 @@ const AdminPanel = () => {
                   </div>
                 </CardContent>
               </Card>
-              </div>
-            )}
+            </div>
 
             {/* Pie Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

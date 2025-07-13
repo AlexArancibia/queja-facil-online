@@ -7,10 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { OBSERVATION_TYPES, MOCK_STORES } from '@/types/complaint';
+import { OBSERVATION_TYPES, MOCK_STORES, type Complaint } from '@/types/complaint';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Send, CheckCircle, X, FileImage } from 'lucide-react';
-import { useComplaintsStore } from '@/stores/complaintsStore';
 
 interface ComplaintFormData {
   fullName: string;
@@ -24,10 +23,10 @@ interface ComplaintFormData {
 const ComplaintForm = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [complaintId, setComplaintId] = useState('');
   const { toast } = useToast();
-  const { createComplaint, loading } = useComplaintsStore();
 
   const {
     register,
@@ -64,14 +63,33 @@ const ComplaintForm = () => {
   };
 
   const onSubmit = async (data: ComplaintFormData) => {
+    setIsSubmitting(true);
+    
     try {
-      const complaintData = {
+      // Generate unique ID
+      const newComplaintId = `SICLO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
+      // Mock complaint creation
+      const newComplaint: Complaint = {
+        id: newComplaintId,
         ...data,
-        status: 'Pendiente' as const,
-        attachments: files
+        status: 'Pendiente',
+        attachments: files,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
-      const newComplaintId = await createComplaint(complaintData);
+      // Store in localStorage for demo
+      const existingComplaints = JSON.parse(localStorage.getItem('complaints') || '[]');
+      existingComplaints.push(newComplaint);
+      localStorage.setItem('complaints', JSON.stringify(existingComplaints));
+
+      console.log('Nueva queja registrada:', newComplaint);
+      console.log('Archivos adjuntos:', files);
+
+      // Simulate email sending
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       setComplaintId(newComplaintId);
       setSubmitted(true);
       
@@ -79,12 +97,15 @@ const ComplaintForm = () => {
         title: "¡Queja registrada exitosamente!",
         description: `Tu ID de queja es: ${newComplaintId}`,
       });
+
     } catch (error) {
       toast({
         title: "Error al registrar la queja",
         description: "Por favor intenta nuevamente",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -132,8 +153,8 @@ const ComplaintForm = () => {
         <CardTitle className="text-siclo-dark text-xl">Registrar Nueva Queja</CardTitle>
       </CardHeader>
       <CardContent className="pt-6">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-siclo-dark font-medium">Nombre Completo *</Label>
               <Input
@@ -168,7 +189,7 @@ const ComplaintForm = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-siclo-dark font-medium">Local *</Label>
               <Select onValueChange={(value) => setValue('store', value)}>
@@ -285,17 +306,14 @@ const ComplaintForm = () => {
 
           <Button 
             type="submit" 
-            className="w-full siclo-button text-base sm:text-lg py-4 sm:py-6" 
-            disabled={loading || !selectedStore || !selectedObservationType || !selectedPriority}
+            className="w-full siclo-button text-lg py-6" 
+            disabled={isSubmitting || !selectedStore || !selectedObservationType || !selectedPriority}
           >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Enviando queja...
-              </>
+            {isSubmitting ? (
+              <>Enviando queja...</>
             ) : (
               <>
-                <Send className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3" />
+                <Send className="w-5 h-5 mr-3" />
                 Enviar Queja
               </>
             )}
