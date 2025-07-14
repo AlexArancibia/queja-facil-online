@@ -1,78 +1,91 @@
 
 import { create } from 'zustand';
+import apiClient from '@/lib/api';
+import { 
+  type User,
+  type CreateUserDto,
+  type UpdateUserDto,
+  type Branch,
+  type PaginatedResponse,
+  UserRole
+} from '@/types/api';
 
-export interface Manager {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  stores: string[];
-  role: 'manager';
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export interface Manager extends User {
+  branches?: Branch[];
+  company?: string;
 }
 
 interface ManagersState {
   managers: Manager[];
   loading: boolean;
   error: string | null;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   
   // Actions
-  fetchManagers: () => Promise<void>;
-  createManager: (manager: Omit<Manager, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  updateManager: (id: string, updates: Partial<Manager>) => Promise<void>;
+  fetchManagers: (params?: { page?: number; limit?: number; branchId?: string }) => Promise<void>;
+  createManager: (manager: CreateUserDto) => Promise<string>;
+  updateManager: (id: string, updates: UpdateUserDto) => Promise<void>;
   deleteManager: (id: string) => Promise<void>;
   toggleManagerStatus: (id: string) => Promise<void>;
+  getManagerById: (id: string) => Promise<Manager>;
 }
 
-// Mock API functions
+// API functions
 const api = {
-  async getManagers(): Promise<Manager[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const stored = localStorage.getItem('managers');
-    return stored ? JSON.parse(stored) : [];
-  },
-
-  async createManager(manager: Omit<Manager, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const newManager: Manager = {
-      ...manager,
-      id: `MGR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-      createdAt: new Date(),
-      updatedAt: new Date()
+  async getManagers(params?: { page?: number; limit?: number; branchId?: string }): Promise<PaginatedResponse<Manager>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.branchId) searchParams.append('branchId', params.branchId);
+    
+    const response = await apiClient.get(`/auth?${searchParams.toString()}`);
+    
+    // Filter only managers and admins
+    const filteredData = response.data.data?.filter((user: User) => 
+      user.role === UserRole.MANAGER || user.role === UserRole.ADMIN
+    ) || [];
+    
+    return {
+      ...response.data,
+      data: filteredData
     };
-    
-    const existing = await this.getManagers();
-    const updated = [...existing, newManager];
-    localStorage.setItem('managers', JSON.stringify(updated));
-    
-    return newManager.id;
   },
 
-  async updateManager(id: string, updates: Partial<Manager>): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const existing = await this.getManagers();
-    const updated = existing.map(m => 
-      m.id === id ? { ...m, ...updates, updatedAt: new Date() } : m
-    );
-    localStorage.setItem('managers', JSON.stringify(updated));
+  async createManager(manager: CreateUserDto): Promise<{ id: string }> {
+    const managerData = {
+      ...manager,
+      role: UserRole.MANAGER
+    };
+    const response = await apiClient.post('/auth', managerData);
+    return response.data;
+  },
+
+  async updateManager(id: string, updates: UpdateUserDto): Promise<void> {
+    await apiClient.patch(`/auth/${id}`, updates);
   },
 
   async deleteManager(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const existing = await this.getManagers();
-    const filtered = existing.filter(m => m.id !== id);
-    localStorage.setItem('managers', JSON.stringify(filtered));
+    await apiClient.delete(`/auth/${id}`);
   },
 
   async toggleManagerStatus(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const existing = await this.getManagers();
-    const updated = existing.map(m => 
-      m.id === id ? { ...m, isActive: !m.isActive, updatedAt: new Date() } : m
-    );
-    localStorage.setItem('managers', JSON.stringify(updated));
+    // First get the current manager to toggle status
+    const response = await apiClient.get(`/auth/${id}`);
+    const manager = response.data;
+    
+    await apiClient.patch(`/auth/${id}`, {
+      isActive: !manager.isActive
+    });
+  },
+
+  async getManagerById(id: string): Promise<Manager> {
+    const response = await apiClient.get(`/auth/${id}`);
+    return response.data;
   }
 };
 
@@ -80,26 +93,41 @@ export const useManagersStore = create<ManagersState>((set, get) => ({
   managers: [],
   loading: false,
   error: null,
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  },
 
-  fetchManagers: async () => {
+  fetchManagers: async (params) => {
     set({ loading: true, error: null });
     try {
-      const managers = await api.getManagers();
-      set({ managers, loading: false });
-    } catch (error) {
-      set({ error: 'Error al cargar los managers', loading: false });
+      const response = await api.getManagers(params);
+      set({ 
+        managers: response.data,
+        pagination: {
+          page: response.page,
+          limit: response.limit,
+          total: response.total,
+          totalPages: response.totalPages
+        },
+        loading: false 
+      });
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || 'Error al cargar los managers', loading: false });
     }
   },
 
   createManager: async (manager) => {
     set({ loading: true, error: null });
     try {
-      const id = await api.createManager(manager);
+      const response = await api.createManager(manager);
       await get().fetchManagers();
       set({ loading: false });
-      return id;
-    } catch (error) {
-      set({ error: 'Error al crear el manager', loading: false });
+      return response.id;
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || 'Error al crear el manager', loading: false });
       throw error;
     }
   },
@@ -110,8 +138,8 @@ export const useManagersStore = create<ManagersState>((set, get) => ({
       await api.updateManager(id, updates);
       await get().fetchManagers();
       set({ loading: false });
-    } catch (error) {
-      set({ error: 'Error al actualizar el manager', loading: false });
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || 'Error al actualizar el manager', loading: false });
       throw error;
     }
   },
@@ -122,8 +150,8 @@ export const useManagersStore = create<ManagersState>((set, get) => ({
       await api.deleteManager(id);
       await get().fetchManagers();
       set({ loading: false });
-    } catch (error) {
-      set({ error: 'Error al eliminar el manager', loading: false });
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || 'Error al eliminar el manager', loading: false });
       throw error;
     }
   },
@@ -134,8 +162,16 @@ export const useManagersStore = create<ManagersState>((set, get) => ({
       await api.toggleManagerStatus(id);
       await get().fetchManagers();
       set({ loading: false });
-    } catch (error) {
-      set({ error: 'Error al cambiar el estado del manager', loading: false });
+    } catch (error: any) {
+      set({ error: error.response?.data?.message || 'Error al cambiar el estado del manager', loading: false });
+      throw error;
+    }
+  },
+
+  getManagerById: async (id) => {
+    try {
+      return await api.getManagerById(id);
+    } catch (error: any) {
       throw error;
     }
   }

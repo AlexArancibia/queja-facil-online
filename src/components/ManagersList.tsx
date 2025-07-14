@@ -132,7 +132,7 @@ const ManagersList = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      {getStoreNames(manager.stores)}
+                      {manager.company || 'Sin asignar'}
                     </div>
                   </div>
                 </div>
@@ -180,22 +180,12 @@ const ManagersList = () => {
                           />
                         </div>
                         <div>
-                          <Label>Locales</Label>
-                          <Select 
-                            value={editForm.stores?.[0] || ''} 
-                            onValueChange={(value) => setEditForm({ ...editForm, stores: [value] })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar local" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {MOCK_STORES.map((store) => (
-                                <SelectItem key={store.id} value={store.id}>
-                                  {store.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label>Empresa</Label>
+                          <Input
+                            value={editForm.company || ''}
+                            onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                            placeholder="Empresa o división"
+                          />
                         </div>
                         <Button onClick={handleSaveEdit} className="w-full siclo-button">
                           Guardar Cambios
