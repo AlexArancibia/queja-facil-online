@@ -28,12 +28,14 @@ interface ComplaintsState {
     branchId?: string;
     status?: ComplaintStatus;
     priority?: ComplaintPriority;
+    startDate?: string;
+    endDate?: string;
   }) => Promise<void>;
   
   createComplaint: (complaint: CreateComplaintDto) => Promise<Complaint>;
   updateComplaint: (id: string, updates: UpdateComplaintDto) => Promise<Complaint>;
   deleteComplaint: (id: string) => Promise<void>;
-  getComplaintStats: (branchId?: string) => Promise<ComplaintStats>;
+  getComplaintStats: (branchId?: string, startDate?: string, endDate?: string) => Promise<ComplaintStats>;
   getComplaintById: (id: string) => Promise<Complaint>;
 }
 
@@ -51,7 +53,7 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
   fetchComplaints: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const { page = 1, limit = 10, branchId, status, priority } = params;
+      const { page = 1, limit = 10, branchId, status, priority, startDate, endDate } = params;
       
       const searchParams = new URLSearchParams();
       searchParams.append('page', page.toString());
@@ -59,6 +61,8 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
       if (branchId) searchParams.append('branchId', branchId);
       if (status) searchParams.append('status', status);
       if (priority) searchParams.append('priority', priority);
+      if (startDate) searchParams.append('startDate', startDate);
+      if (endDate) searchParams.append('endDate', endDate);
       
       const response = await apiClient.get<PaginatedResponse<Complaint>>(
         `/complaints?${searchParams.toString()}`
@@ -67,10 +71,10 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
       set({ 
         complaints: response.data.data,
         pagination: {
-          page: response.data.page,
-          limit: response.data.limit,
-          total: response.data.total,
-          totalPages: response.data.totalPages
+          page: response.data.pagination.page,
+          limit: response.data.pagination.limit,
+          total: response.data.pagination.total,
+          totalPages: response.data.pagination.totalPages
         },
         loading: false 
       });
@@ -148,11 +152,13 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
     }
   },
 
-  getComplaintStats: async (branchId) => {
+  getComplaintStats: async (branchId, startDate, endDate) => {
     set({ loading: true, error: null });
     try {
       const searchParams = new URLSearchParams();
       if (branchId) searchParams.append('branchId', branchId);
+      if (startDate) searchParams.append('startDate', startDate);
+      if (endDate) searchParams.append('endDate', endDate);
       
       const response = await apiClient.get<ComplaintStats>(
         `/complaints/stats?${searchParams.toString()}`

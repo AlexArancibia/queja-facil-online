@@ -128,41 +128,14 @@ const Navbar = () => {
             />
           </Link>
           
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Solo para usuarios no autenticados */}
           <nav className="hidden md:flex items-center space-x-12 mt-1">
-            {/* Item de Inicio siempre visible */}
-            <Link to="/" className={getLinkClasses()}>
-              Inicio
-            </Link>
-
-            {/* Navegación para usuarios autenticados */}
-            {isAuthenticated && (
-              <>
-                {/* Dashboard específico según rol */}
-                <Link 
-                  to={getDashboardRoute(user?.role)} 
-                  className={getLinkClasses()}
-                >
-                  Dashboard
-                </Link>
-
-                {/* Solo admin ve quejas y calificaciones */}
-                {user?.role === UserRole.ADMIN && (
-                  <>
-                    <Link to="/complaints" className={getLinkClasses()}>
-                      Quejas
-                    </Link>
-                    <Link to="/ratings" className={getLinkClasses()}>
-                      Valoraciones
-                    </Link>
-                  </>
-                )}
-              </>
-            )}
-
             {/* Navegación para usuarios no registrados */}
             {!isAuthenticated && (
               <>
+                <Link to="/" className={getLinkClasses()}>
+                  Inicio
+                </Link>
                 <Link to="/complaints" className={getLinkClasses()}>
                   Registrar Queja
                 </Link>
@@ -378,13 +351,33 @@ const Navbar = () => {
             ) : isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Button 
+                    variant="ghost" 
+                    className={`relative flex items-center space-x-3 px-3 bg-gray-100/65 py-2 h-auto rounded-lg hover:bg-gray-100 transition-colors ${
+                      isLoginPage ? 'text-white hover:bg-white/10' : 'text-gray-700'
+                    }`}
+                  >
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user?.image} alt={user?.name} />
                       <AvatarFallback className="bg-siclo-deep-blue text-white">
                         {getInitials(user?.name)}
                       </AvatarFallback>
                     </Avatar>
+                    <div className="flex flex-col items-start text-left">
+                      <div className="flex items-center space-x-1">
+                        {getRoleIcon(user?.role)}
+                        <span className={`text-sm font-medium ${
+                          isLoginPage ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {user?.name}
+                        </span>
+                      </div>
+                      <span className={`text-xs ${
+                        isLoginPage ? 'text-white/70' : 'text-gray-500'
+                      }`}>
+                        {getRoleText(user?.role)}
+                      </span>
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>

@@ -63,11 +63,23 @@ import {
   Mail,
   Phone,
   Edit,
-  Trash2
+  Trash2,
+  Eye,
+  MoreHorizontal
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import EditUserModal from '@/components/EditUserModal';
+import AttachmentsViewer from '@/components/AttachmentsViewer';
+import DateRangeFilterAdvanced from '@/components/DateRangeFilterAdvanced';
+import { ComplaintStatsCards } from '@/components/ComplaintStatsCards';
+import { RatingStatsCards } from '@/components/RatingStatsCards';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Create a proper combined type for unified activity view
 type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
@@ -87,14 +99,18 @@ const AdminPanel = () => {
     complaints, 
     loading: complaintsLoading, 
     fetchComplaints, 
-    getComplaintStats 
+    getComplaintStats,
+    deleteComplaint,
+    pagination: complaintsPagination
   } = useComplaintsStore();
   
   const { 
     ratings, 
     loading: ratingsLoading, 
     fetchRatings, 
-    getRatingStats 
+    getRatingStats,
+    deleteRating,
+    pagination: ratingsPagination
   } = useRatingsStore();
   
   const { 
@@ -111,13 +127,14 @@ const AdminPanel = () => {
 
   // Local state
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
   const [filterBranch, setFilterBranch] = useState('all');
+  const [filterInstructor, setFilterInstructor] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [complaintStats, setComplaintStats] = useState<any>(null);
-  const [ratingStats, setRatingStats] = useState<any>(null);
+
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(() => {
     return searchParams.get('tab') || 'complaints';
@@ -129,6 +146,9 @@ const AdminPanel = () => {
   // 1. Estado para dialog de detalle
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<CombinedActivity | null>(null);
+  
+  // Estado para acciones de tabla
+  const [deletingItem, setDeletingItem] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('🔍 AdminPanel useEffect - user:', user);
@@ -149,20 +169,39 @@ const AdminPanel = () => {
     }
   }, [searchParams]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterPriority, filterBranch, filterInstructor, filterType, startDate, endDate]);
+
+  // Fetch data when filters change (always start at page 1)
+  useEffect(() => {
+    if (activeTab === 'complaints') {
+      fetchFilteredComplaints(1);
+    } else if (activeTab === 'ratings') {
+      fetchFilteredRatings(1);
+    }
+  }, [filterStatus, filterPriority, filterBranch, filterInstructor, startDate, endDate, activeTab]);
+
   const loadData = async () => {
     console.log('🚀 Iniciando carga de datos para admin...');
     setIsInitialLoading(true);
     try {
-      // Load all data for admin (no filters - admin sees everything)
+      // Load basic data and initial complaints/ratings without filters
       await Promise.all([
-        fetchComplaints({ limit: 1000 }), // Get all complaints
-        fetchRatings({ limit: 1000 }), // Get all ratings
         fetchBranches(), // Get all branches
         fetchInstructors(), // Get all instructors
         getAllUsers(), // Get all users
-        loadStats()
+        fetchComplaints({
+          page: 1,
+          limit: itemsPerPage,
+        }), // Get initial complaints
+        fetchRatings({
+          page: 1,
+          limit: itemsPerPage,
+        }), // Get initial ratings
       ]);
-      console.log('✅ Datos cargados exitosamente');
+      console.log('✅ Datos básicos cargados exitosamente');
     } catch (error) {
       console.error('❌ Error loading data:', error);
       toast({
@@ -175,22 +214,17 @@ const AdminPanel = () => {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const [complaintStatsData, ratingStatsData] = await Promise.all([
-        getComplaintStats(),
-        getRatingStats()
-      ]);
-      setComplaintStats(complaintStatsData);
-      setRatingStats(ratingStatsData);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
+
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  // Handle tab changes with URL navigation
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    navigate(`/admin?tab=${newTab}`);
   };
 
   const getStatusColor = (status: ComplaintStatus) => {
@@ -316,29 +350,130 @@ const AdminPanel = () => {
     }
   };
 
-  // Filter data by date range
-  const filterByDateRange = (data: any[]) => {
-    if (!startDate && !endDate) return data;
-    
-    return data.filter(item => {
-      const itemDate = new Date(item.createdAt);
-      if (startDate && itemDate < startDate) return false;
-      if (endDate && itemDate > endDate) return false;
-      return true;
+  // Funciones para acciones de tabla
+  const handleViewDetail = (item: any, type: 'complaint' | 'rating') => {
+    setSelectedDetail({ 
+      ...item, 
+      type, 
+      activityDate: new Date(item.createdAt) 
     });
+    setDetailDialogOpen(true);
   };
 
-  const filteredComplaints = filterByDateRange(complaints);
-  const filteredRatings = filterByDateRange(ratings);
+  const handleDeleteComplaint = async (id: string) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta queja? Esta acción no se puede deshacer.')) {
+      try {
+        setDeletingItem(id);
+        await deleteComplaint(id);
+        toast({
+          title: "Queja eliminada",
+          description: "La queja ha sido eliminada exitosamente",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Error al eliminar la queja",
+          variant: "destructive"
+        });
+      } finally {
+        setDeletingItem(null);
+      }
+    }
+  };
 
-  // Combine complaints and ratings for unified view
+  const handleDeleteRating = async (id: string) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta calificación? Esta acción no se puede deshacer.')) {
+      try {
+        setDeletingItem(id);
+        await deleteRating(id);
+        toast({
+          title: "Calificación eliminada",
+          description: "La calificación ha sido eliminada exitosamente",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Error al eliminar la calificación",
+          variant: "destructive"
+        });
+      } finally {
+        setDeletingItem(null);
+      }
+    }
+  };
+
+    // Helper function to format dates for API
+  const formatDateForAPI = (date: Date | undefined): string | undefined => {
+    if (!date) return undefined;
+    return date.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+  };
+
+  // Fetch data with current filters for specific page
+  const fetchFilteredComplaints = async (page: number = 1) => {
+    console.log('🚀 FETCHING COMPLAINTS - Page:', page, 'Filters:', {
+      status: filterStatus !== 'all' ? filterStatus : undefined,
+      priority: filterPriority !== 'all' ? filterPriority : undefined,
+      branchId: filterBranch !== 'all' ? filterBranch : undefined,
+      startDate: formatDateForAPI(startDate),
+      endDate: formatDateForAPI(endDate),
+    });
+    try {
+      await fetchComplaints({
+        page: page,
+        limit: itemsPerPage,
+        status: filterStatus !== 'all' ? (filterStatus as ComplaintStatus) : undefined,
+        priority: filterPriority !== 'all' ? (filterPriority as ComplaintPriority) : undefined,
+        branchId: filterBranch !== 'all' ? filterBranch : undefined,
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate),
+      });
+      console.log('✅ COMPLAINTS FETCHED - New data:', complaints.length, 'items');
+    } catch (error) {
+      console.error('❌ Error fetching filtered complaints:', error);
+    }
+  };
+
+  const fetchFilteredRatings = async (page: number = 1) => {
+    console.log('🌟 FETCHING RATINGS - Page:', page, 'Filters:', {
+      branchId: filterBranch !== 'all' ? filterBranch : undefined,
+      instructorId: filterInstructor !== 'all' ? filterInstructor : undefined,
+      startDate: formatDateForAPI(startDate),
+      endDate: formatDateForAPI(endDate),
+    });
+    try {
+      await fetchRatings({
+        page: page,
+        limit: itemsPerPage,
+        branchId: filterBranch !== 'all' ? filterBranch : undefined,
+        instructorId: filterInstructor !== 'all' ? filterInstructor : undefined,
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate),
+      });
+      console.log('✅ RATINGS FETCHED - New data:', ratings.length, 'items');
+    } catch (error) {
+      console.error('❌ Error fetching filtered ratings:', error);
+    }
+  };
+
+  // Pagination handlers - fetch specific page on demand
+  const handleComplaintsPageChange = (newPage: number) => {
+    console.log('📄 COMPLAINTS PAGE CLICKED:', newPage);
+    fetchFilteredComplaints(newPage);
+  };
+
+  const handleRatingsPageChange = (newPage: number) => {
+    console.log('⭐ RATINGS PAGE CLICKED:', newPage);
+    fetchFilteredRatings(newPage);
+  };
+
+  // Combine complaints and ratings for unified view (legacy - now mostly using backend pagination)
   const combinedData: CombinedActivity[] = [
-    ...filteredComplaints.map(complaint => ({
+    ...complaints.map(complaint => ({
       ...complaint,
       type: 'complaint' as const,
       activityDate: new Date(complaint.createdAt)
     })),
-    ...filteredRatings.map(rating => ({
+    ...ratings.map(rating => ({
       ...rating,
       type: 'rating' as const,
       activityDate: new Date(rating.createdAt)
@@ -348,22 +483,44 @@ const AdminPanel = () => {
   const filteredData = combinedData.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
     if (filterBranch !== 'all' && item.branchId !== filterBranch) return false;
+    if (filterInstructor !== 'all' && item.type === 'rating' && item.instructorId !== filterInstructor) return false;
     if (filterStatus !== 'all' && item.type === 'complaint' && item.status !== filterStatus) return false;
     return true;
   }).sort((a, b) => b.activityDate.getTime() - a.activityDate.getTime());
 
-  // Pagination logic
+  // Direct pagination values from stores
+  const complaintsCurrentPage = complaintsPagination.page;
+  const complaintsTotalPages = complaintsPagination.totalPages || 1;
+  const ratingsCurrentPage = ratingsPagination.page;
+  const ratingsTotalPages = ratingsPagination.totalPages || 1;
+
+  // Debug: Log variables to console
+  console.log('🔍 DEBUG PAGINATION:', {
+    complaints: complaints,
+    complaintsLength: complaints.length,
+    complaintsCurrentPage,
+    complaintsTotalPages,
+    complaintsPagination,
+    ratings: ratings,
+    ratingsLength: ratings.length,
+    ratingsCurrentPage,
+    ratingsTotalPages,
+    ratingsPagination,
+    activeTab
+  });
+
+  // Legacy pagination for combined view (if needed)
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
   const getQuickStats = () => {
-    const totalComplaints = filteredComplaints.length;
-    const totalRatings = filteredRatings.length;
-    const pendingComplaints = filteredComplaints.filter(c => c.status === ComplaintStatus.PENDING).length;
-    const resolvedComplaints = filteredComplaints.filter(c => c.status === ComplaintStatus.RESOLVED).length;
-    const averageRating = filteredRatings.length > 0 
-      ? filteredRatings.reduce((acc, rating) => {
+    const totalComplaints = complaintsPagination.total || complaints.length;
+    const totalRatings = ratingsPagination.total || ratings.length;
+    const pendingComplaints = complaints.filter(c => c.status === ComplaintStatus.PENDING).length;
+    const resolvedComplaints = complaints.filter(c => c.status === ComplaintStatus.RESOLVED).length;
+    const averageRating = ratings.length > 0 
+      ? ratings.reduce((acc, rating) => {
           const avgRating = (
             rating.instructorRating +
             rating.cleanlinessRating +
@@ -373,7 +530,7 @@ const AdminPanel = () => {
             rating.punctualityRating
           ) / 6;
           return acc + avgRating;
-        }, 0) / filteredRatings.length
+        }, 0) / ratings.length
       : 0;
     const totalBranches = branches.length;
     const totalInstructors = instructors.length;
@@ -389,20 +546,20 @@ const AdminPanel = () => {
     };
   };
 
-  const quickStats = getQuickStats();
+  // Removed quickStats - now using server-side stats from components
 
   // Data for pie charts
   const statusData = [
-    { name: 'Pendiente', value: filteredComplaints.filter(c => c.status === ComplaintStatus.PENDING).length, color: '#f59e0b' },
-    { name: 'En proceso', value: filteredComplaints.filter(c => c.status === ComplaintStatus.IN_PROGRESS).length, color: '#3b82f6' },
-    { name: 'Resuelta', value: filteredComplaints.filter(c => c.status === ComplaintStatus.RESOLVED).length, color: '#10b981' },
-    { name: 'Rechazada', value: filteredComplaints.filter(c => c.status === ComplaintStatus.REJECTED).length, color: '#ef4444' },
+    { name: 'Pendiente', value: complaints.filter(c => c.status === ComplaintStatus.PENDING).length, color: '#f59e0b' },
+    { name: 'En proceso', value: complaints.filter(c => c.status === ComplaintStatus.IN_PROGRESS).length, color: '#3b82f6' },
+    { name: 'Resuelta', value: complaints.filter(c => c.status === ComplaintStatus.RESOLVED).length, color: '#10b981' },
+    { name: 'Rechazada', value: complaints.filter(c => c.status === ComplaintStatus.REJECTED).length, color: '#ef4444' },
   ].filter(item => item.value > 0);
 
   const priorityData = [
-    { name: 'Alta', value: filteredComplaints.filter(c => c.priority === ComplaintPriority.HIGH).length, color: '#ef4444' },
-    { name: 'Media', value: filteredComplaints.filter(c => c.priority === ComplaintPriority.MEDIUM).length, color: '#f59e0b' },
-    { name: 'Baja', value: filteredComplaints.filter(c => c.priority === ComplaintPriority.LOW).length, color: '#10b981' },
+    { name: 'Alta', value: complaints.filter(c => c.priority === ComplaintPriority.HIGH).length, color: '#ef4444' },
+    { name: 'Media', value: complaints.filter(c => c.priority === ComplaintPriority.MEDIUM).length, color: '#f59e0b' },
+    { name: 'Baja', value: complaints.filter(c => c.priority === ComplaintPriority.LOW).length, color: '#10b981' },
   ].filter(item => item.value > 0);
 
   // Loading state
@@ -432,12 +589,12 @@ const AdminPanel = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-siclo-light pt-16 via-white to-blue-50/30">
+    <div className="min-h-screen pt-16 bg-siclo-light">
       {/* Header */}
  
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14">
+      <div className="container  mx-auto px-4 sm:px-6 lg:px-16 pt-0 pb-8 md:py-8">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 ">
+          <TabsList className="  w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14 hidden md:grid">
             <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <MessageSquareText className="h-4 w-4 mr-2" />
               Quejas
@@ -465,516 +622,562 @@ const AdminPanel = () => {
           </TabsList>
 
           <TabsContent value="complaints" className="space-y-6">
-            {/* Filtros de quejas: minimalista, ancho completo, con título */}
-            <div className="w-full">
-  {/* Contenedor principal ultra minimalista */}
-  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
-    {/* Título más grande */}
-    <div className="mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Filtros</h3>
-    </div>
-
-    <div className="flex flex-wrap gap-2 items-center w-full">
-      
-      {/* Filtro de Estado */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[180px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-md mr-2">
-          <Filter className="h-3 w-3 text-green-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Estado</label>
+            {/* Filtros de quejas: elegante, moderno y minimalista */}
+            <Card className="siclo-card border-0 bg-white/60 backdrop-blur-sm shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-3 min-w-0">
+                  <h3 className="text-lg font-medium text-siclo-dark/80 mr-2 flex-shrink-0">Filtros:</h3>
+                  
+                  {/* Estado */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-amber-400"></div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="h-6 border-0 bg-transparent text-gray-800 text-sm focus:ring-0 focus:outline-none shadow-none px-0">
-              <SelectValue placeholder="Seleccionar" />
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[100px]">
+                        <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="all">Todos los estados</SelectItem>
               <SelectItem value={ComplaintStatus.PENDING}>Pendiente</SelectItem>
               <SelectItem value={ComplaintStatus.IN_PROGRESS}>En proceso</SelectItem>
               <SelectItem value={ComplaintStatus.RESOLVED}>Resuelta</SelectItem>
               <SelectItem value={ComplaintStatus.REJECTED}>Rechazada</SelectItem>
             </SelectContent>
           </Select>
-        </div>
       </div>
 
-      {/* Filtro de Sucursal */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[180px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-blue-100 rounded-md mr-2">
-          <Store className="h-3 w-3 text-blue-600" />
+                  {/* Prioridad */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                    <Select value={filterPriority} onValueChange={setFilterPriority}>
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[100px]">
+                        <SelectValue placeholder="Prioridad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las prioridades</SelectItem>
+                        <SelectItem value={ComplaintPriority.HIGH}>Alta</SelectItem>
+                        <SelectItem value={ComplaintPriority.MEDIUM}>Media</SelectItem>
+                        <SelectItem value={ComplaintPriority.LOW}>Baja</SelectItem>
+                      </SelectContent>
+                    </Select>
         </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Sucursal</label>
+
+                  {/* Sucursal */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-blue-400"></div>
           <Select value={filterBranch} onValueChange={setFilterBranch}>
-            <SelectTrigger className="h-6 border-0 bg-transparent text-gray-800 text-sm focus:ring-0 focus:outline-none shadow-none px-0">
-              <SelectValue placeholder="Seleccionar" />
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[120px]">
+                        <SelectValue placeholder="Sucursal" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="all">Todas las sucursales</SelectItem>
               {branches.map((branch) => (
                 <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
       </div>
 
-      {/* Filtro de Fecha */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[220px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-md mr-2">
-          <Calendar className="h-3 w-3 text-gray-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Fechas</label>
-          <DateRangeFilter
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            className="!gap-1 [&_button]:h-6 [&_button]:text-xs [&_button]:rounded-md [&_button]:bg-white [&_button]:border [&_button]:border-gray-200 [&_button]:hover:bg-gray-50 [&_button]:transition-colors [&_button]:duration-200 px-0"
-          />
-        </div>
-      </div>
+                  {/* Rango de Fechas Avanzado */}
+                  <DateRangeFilterAdvanced
+                    startDate={startDate}
+                    endDate={endDate}
+                    onStartDateChange={setStartDate}
+                    onEndDateChange={setEndDate}
+                  />
 
-    </div>
+                                    {/* Reset filters button */}
+                  {(filterStatus !== 'all' || filterPriority !== 'all' || filterBranch !== 'all' || startDate || endDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFilterStatus('all');
+                        setFilterPriority('all');
+                        setFilterBranch('all');
+                        setStartDate(undefined);
+                        setEndDate(undefined);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 h-auto"
+                    >
+                      ✕ Limpiar
+                    </Button>
+                  )}
+
+                  {/* Indicador de resultados */}
+                  <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-siclo-green/10 text-siclo-green text-xs font-medium flex-shrink-0">
+                    <Activity className="w-3 h-3" />
+                    <span className="hidden sm:inline">{complaintsPagination.total || complaints.length} resultados</span>
+                    <span className="sm:hidden">{complaintsPagination.total || complaints.length}</span>
+                  </div>
   </div>
-</div>
-            {/* Cards de resumen de quejas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Total Quejas */}
-              <Card className="siclo-card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-red-700">Total Quejas</p>
-                      <p className="text-3xl font-bold text-red-900">{filteredComplaints.length}</p>
-                    </div>
-                    <MessageSquareText className="h-8 w-8 text-red-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Pendientes */}
-              <Card className="siclo-card bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-amber-700">Pendientes</p>
-                      <p className="text-3xl font-bold text-amber-900">{filteredComplaints.filter(c => c.status === ComplaintStatus.PENDING).length}</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-amber-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Resueltas */}
-              <Card className="siclo-card bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-emerald-700">Resueltas</p>
-                      <p className="text-3xl font-bold text-emerald-900">{filteredComplaints.filter(c => c.status === ComplaintStatus.RESOLVED).length}</p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-emerald-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Rechazadas */}
-              <Card className="siclo-card bg-gradient-to-br from-red-100 to-red-200 border-red-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-red-700">Rechazadas</p>
-                      <p className="text-3xl font-bold text-red-900">{filteredComplaints.filter(c => c.status === ComplaintStatus.REJECTED).length}</p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-600" />
-                  </div>
-                </CardContent>
-              </Card>
-                    </div>
+              </CardContent>
+            </Card>
+            {/* Stats de quejas desde el servidor */}
+            <ComplaintStatsCards 
+              branchId={filterBranch !== 'all' ? filterBranch : undefined}
+              startDate={formatDateForAPI(startDate)}
+              endDate={formatDateForAPI(endDate)}
+            />
             {/* Tabla de quejas sin scrollarea, solo quejas */}
             <Card className="siclo-card">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-siclo-dark">
-                    Quejas ({filteredComplaints.length})
+                    Quejas ({complaintsPagination.total || complaints.length})
                   </CardTitle>
                   <Badge variant="outline" className="border-siclo-green text-siclo-green">
-                    Página {currentPage} de {totalPages || 1}
+                    Página {complaintsCurrentPage} de {complaintsTotalPages}
                   </Badge>
                   </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {filteredComplaints
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                    .map((item) => (
-                      <Card key={item.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300 cursor-pointer"
-                        onClick={() => { setSelectedDetail({ ...item, type: 'complaint', activityDate: new Date(item.createdAt) }); setDetailDialogOpen(true); }}
-                      >
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex gap-2">
-                              <Badge className="bg-red-100 text-red-800 border-red-200 border">Queja</Badge>
-                              <Badge className={`${getStatusColor(item.status)} border`}>
-                                {getStatusText(item.status)}
-                              </Badge>
-                            </div>
-                            <div className="text-xs text-siclo-dark/60 flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(item.createdAt).toLocaleDateString('es-ES')}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div className="flex items-center">
-                              <User className="h-4 w-4 mr-2 text-siclo-green" />
-                              <span className="font-medium text-siclo-dark">{item.fullName}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Store className="h-4 w-4 mr-2 text-siclo-blue" />
-                              <span className="text-siclo-dark/70">{getBranchName(item.branchId)}</span>
-                            </div>
-                            <div className="text-siclo-dark/70">{item.observationType}</div>
-                          </div>
-                          <p className="text-sm text-siclo-dark/70 mt-2 line-clamp-2">{item.detail}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  
-                  {filteredComplaints.length === 0 && (
-                    <div className="text-center text-siclo-dark/60 py-12">
-                      <MessageSquareText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No hay quejas que coincidan con los filtros</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-6 flex justify-center">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            href="#" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage > 1) setCurrentPage(currentPage - 1);
-                            }}
-                          />
-                        </PaginationItem>
-                        
-                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                          let page;
-                          if (totalPages <= 5) {
-                            page = i + 1;
-                          } else {
-                            const start = Math.max(1, currentPage - 2);
-                            page = start + i;
-                          }
-                          
-                          if (page <= totalPages) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    setCurrentPage(page);
-                                  }}
-                                  isActive={currentPage === page}
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <PaginationItem>
-                          <PaginationNext 
-                            href="#" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                            }}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+              <CardContent className="p-4">
+                {complaints.length === 0 ? (
+                  <div className="text-center text-siclo-dark/60 py-12">
+                    <MessageSquareText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No hay quejas que coincidan con los filtros</p>
                   </div>
+                ) : (
+                  <>
+                    {/* Grid de cards para móvil y tablet */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4 mb-6">
+                      {complaints
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((item) => (
+                          <Card key={item.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300 cursor-pointer"
+                            onClick={() => handleViewDetail(item, 'complaint')}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge className={`${getStatusColor(item.status)} text-xs`}>
+                                    {getStatusText(item.status)}
+                                  </Badge>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${
+                                      item.priority === ComplaintPriority.HIGH ? 'border-red-300 text-red-700' :
+                                      item.priority === ComplaintPriority.MEDIUM ? 'border-amber-300 text-amber-700' :
+                                      'border-green-300 text-green-700'
+                                    }`}
+                                  >
+                                    {getPriorityText(item.priority)}
+                                  </Badge>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-[160px]">
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetail(item, 'complaint'); }}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalle
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteComplaint(item.id); }}
+                                      className="text-red-600"
+                                      disabled={deletingItem === item.id}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      {deletingItem === item.id ? 'Eliminando...' : 'Eliminar'}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              
+                              <div className="space-y-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4 text-siclo-green flex-shrink-0" />
+                                  <span className="font-medium truncate">{item.fullName}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Store className="h-4 w-4 text-siclo-blue flex-shrink-0" />
+                                  <span className="text-siclo-dark/70 truncate">{getBranchName(item.branchId)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                  <span className="text-siclo-dark/70 truncate">{item.observationType}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                  <span className="text-gray-500 text-xs">
+                                    {new Date(item.createdAt).toLocaleDateString('es-ES', { 
+                                      day: '2-digit', 
+                                      month: '2-digit',
+                                      year: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <p className="text-xs text-siclo-dark/60 line-clamp-2" title={item.detail}>
+                                  {item.detail}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </div>
+
+                    {/* Tabla para desktop */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50/50">
+                            <TableHead className="w-[100px] text-xs font-medium">Fecha</TableHead>
+                            <TableHead className="text-xs font-medium">Usuario</TableHead>
+                            <TableHead className="text-xs font-medium">Sucursal</TableHead>
+                            <TableHead className="text-xs font-medium">Tipo</TableHead>
+                            <TableHead className="text-xs font-medium">Estado</TableHead>
+                            <TableHead className="text-xs font-medium">Prioridad</TableHead>
+                            <TableHead className="text-xs font-medium">Detalle</TableHead>
+                            <TableHead className="w-[80px] text-xs font-medium">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {complaints
+                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                            .map((item) => (
+                              <TableRow key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                <TableCell className="text-xs text-gray-600">
+                                  {new Date(item.createdAt).toLocaleDateString('es-ES', { 
+                                    day: '2-digit', 
+                                    month: '2-digit',
+                                    year: '2-digit'
+                                  })}
+                                </TableCell>
+                                <TableCell className="font-medium text-sm max-w-[150px]">
+                                  <div className="truncate" title={item.fullName}>
+                                    {item.fullName}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-600">
+                                  <div className="truncate max-w-[120px]" title={getBranchName(item.branchId)}>
+                                    {getBranchName(item.branchId)}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-600">
+                                  <div className="truncate max-w-[100px]" title={item.observationType}>
+                                    {item.observationType}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={`${getStatusColor(item.status)} text-xs`}>
+                                    {getStatusText(item.status)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${
+                                      item.priority === ComplaintPriority.HIGH ? 'border-red-300 text-red-700' :
+                                      item.priority === ComplaintPriority.MEDIUM ? 'border-amber-300 text-amber-700' :
+                                      'border-green-300 text-green-700'
+                                    }`}
+                                  >
+                                    {getPriorityText(item.priority)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="max-w-[200px]">
+                                  <div className="text-xs text-gray-600 truncate" title={item.detail}>
+                                    {item.detail}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[160px]">
+                                      <DropdownMenuItem onClick={() => handleViewDetail(item, 'complaint')}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        Ver detalle
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => handleDeleteComplaint(item.id)}
+                                        className="text-red-600"
+                                        disabled={deletingItem === item.id}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        {deletingItem === item.id ? 'Eliminando...' : 'Eliminar'}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
-                </CardContent>
-              </Card>
+
+                {/* Paginación para quejas */}
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (complaintsCurrentPage > 1) handleComplaintsPageChange(complaintsCurrentPage - 1);
+                          }}
+                          className={complaintsCurrentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(complaintsTotalPages, 5) }, (_, i) => {
+                        let page;
+                        if (complaintsTotalPages <= 5) {
+                          page = i + 1;
+                        } else {
+                          const start = Math.max(1, complaintsCurrentPage - 2);
+                          page = start + i;
+                        }
+                        
+                        if (page <= complaintsTotalPages) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleComplaintsPageChange(page);
+                                }}
+                                isActive={complaintsCurrentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (complaintsCurrentPage < complaintsTotalPages) handleComplaintsPageChange(complaintsCurrentPage + 1);
+                          }}
+                          className={complaintsCurrentPage >= complaintsTotalPages ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="ratings" className="space-y-6">
-            {/* Filtros de calificaciones: minimalista, ancho completo, con título */}
-            <div className="w-full">
-  {/* Contenedor principal ultra minimalista */}
-  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
-    {/* Título más grande */}
-    <div className="mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Filtros</h3>
-    </div>
-
-    <div className="flex flex-wrap gap-2 items-center w-full">
-      
-      {/* Filtro de Instructor */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[180px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-md mr-2">
-          <User className="h-3 w-3 text-green-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Instructor</label>
-          <Select value={filterBranch} onValueChange={setFilterBranch}>
-            <SelectTrigger className="h-6 border-0 bg-transparent text-gray-800 text-sm focus:ring-0 focus:outline-none shadow-none px-0">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {instructors.map((instructor) => (
-                <SelectItem key={instructor.id} value={instructor.id}>{instructor.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Filtro de Sucursal */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[180px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-blue-100 rounded-md mr-2">
-          <Store className="h-3 w-3 text-blue-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Sucursal</label>
-          <Select value={filterBranch} onValueChange={setFilterBranch}>
-            <SelectTrigger className="h-6 border-0 bg-transparent text-gray-800 text-sm focus:ring-0 focus:outline-none shadow-none px-0">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Filtro de Disciplina */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[180px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-md mr-2">
-          <BarChart3 className="h-3 w-3 text-gray-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Disciplina</label>
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="h-6 border-0 bg-transparent text-gray-800 text-sm focus:ring-0 focus:outline-none shadow-none px-0">
-              <SelectValue placeholder="Seleccionar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              <SelectItem value="driving">Conducción</SelectItem>
-              <SelectItem value="theory">Teoría</SelectItem>
-              <SelectItem value="practical">Práctica</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Filtro de Fecha */}
-      <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 min-w-[220px] flex-1 border border-gray-100">
-        <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-md mr-2">
-          <Calendar className="h-3 w-3 text-gray-600" />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-gray-600 mb-0.5 block">Fechas</label>
-          <DateRangeFilter
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            className="!gap-1 [&_button]:h-6 [&_button]:text-xs [&_button]:rounded-md [&_button]:bg-white [&_button]:border [&_button]:border-gray-200 [&_button]:hover:bg-gray-50 [&_button]:transition-colors [&_button]:duration-200 px-0"
-          />
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-            {/* Cards de resumen de calificaciones */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Total Calificaciones */}
-              <Card className="siclo-card bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-blue-700">Total Calificaciones</p>
-                      <p className="text-3xl font-bold text-blue-900">{filteredRatings.length}</p>
-                    </div>
-                    <Star className="h-8 w-8 text-blue-600" />
+            {/* Filtros de calificaciones: elegante, moderno y minimalista */}
+            <Card className="siclo-card border-0 bg-white/60 backdrop-blur-sm shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-3 min-w-0">
+                  <h3 className="text-lg font-medium text-siclo-dark/80 mr-2 flex-shrink-0">Filtros:</h3>
+                  
+                  {/* Instructor */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+                    <Select value={filterInstructor} onValueChange={setFilterInstructor}>
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[120px]">
+                        <SelectValue placeholder="Instructor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los instructores</SelectItem>
+                        {instructors.map((instructor) => (
+                          <SelectItem key={instructor.id} value={instructor.id}>{instructor.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-              {/* Promedio */}
-              <Card className="siclo-card bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-cyan-700">Promedio</p>
-                      <p className="text-3xl font-bold text-cyan-900">{filteredRatings.length > 0 ? (filteredRatings.reduce((acc, r) => acc + ((r.instructorRating + r.cleanlinessRating + r.audioRating + r.attentionQualityRating + r.amenitiesRating + r.punctualityRating) / 6), 0) / filteredRatings.length).toFixed(1) : '0.0'}</p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-cyan-600" />
+
+                  {/* Sucursal */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                    <Select value={filterBranch} onValueChange={setFilterBranch}>
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[120px]">
+                        <SelectValue placeholder="Sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las sucursales</SelectItem>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-              {/* NPS promedio */}
-              <Card className="siclo-card bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-amber-700">NPS Promedio</p>
-                      <p className="text-3xl font-bold text-amber-900">{filteredRatings.length > 0 ? (filteredRatings.reduce((acc, r) => acc + r.npsScore, 0) / filteredRatings.length).toFixed(1) : '0.0'}</p>
-                    </div>
-                    <PieChart className="h-8 w-8 text-amber-600" />
+
+                  {/* Disciplina */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[100px]">
+                        <SelectValue placeholder="Disciplina" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las disciplinas</SelectItem>
+                        <SelectItem value="driving">Conducción</SelectItem>
+                        <SelectItem value="theory">Teoría</SelectItem>
+                        <SelectItem value="practical">Práctica</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
-              {/* Calificaciones última semana */}
-              <Card className="siclo-card bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-indigo-700">Última semana</p>
-                      <p className="text-3xl font-bold text-indigo-900">{filteredRatings.filter(r => new Date(r.createdAt) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length}</p>
-                    </div>
-                    <Calendar className="h-8 w-8 text-indigo-600" />
+
+                  {/* Rango de Fechas Avanzado */}
+                  <DateRangeFilterAdvanced
+                    startDate={startDate}
+                    endDate={endDate}
+                    onStartDateChange={setStartDate}
+                    onEndDateChange={setEndDate}
+                  />
+
+                  {/* Reset filters button */}
+                  {(filterInstructor !== 'all' || filterBranch !== 'all' || filterType !== 'all' || startDate || endDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFilterInstructor('all');
+                        setFilterBranch('all');
+                        setFilterType('all');
+                        setStartDate(undefined);
+                        setEndDate(undefined);
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 h-auto"
+                    >
+                      ✕ Limpiar
+                    </Button>
+                  )}
+
+                  {/* Indicador de resultados */}
+                  <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-siclo-green/10 text-siclo-green text-xs font-medium flex-shrink-0">
+                    <Star className="w-3 h-3" />
+                    <span className="hidden sm:inline">{ratingsPagination.total || ratings.length} resultados</span>
+                    <span className="sm:hidden">{ratingsPagination.total || ratings.length}</span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Stats de calificaciones desde el servidor */}
+            <RatingStatsCards 
+              branchId={filterBranch !== 'all' ? filterBranch : undefined}
+              instructorId={filterInstructor !== 'all' ? filterInstructor : undefined}
+              startDate={formatDateForAPI(startDate)}
+              endDate={formatDateForAPI(endDate)}
+            />
+            
             {/* Tabla de calificaciones sin scrollarea, solo calificaciones */}
             <Card className="siclo-card">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-siclo-dark">
-                    Calificaciones ({filteredRatings.length})
+                    Calificaciones ({ratingsPagination.total || ratings.length})
                   </CardTitle>
                   <Badge variant="outline" className="border-siclo-green text-siclo-green">
-                    Página {currentPage} de {totalPages || 1}
+                    Página {ratingsCurrentPage} de {ratingsTotalPages}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {filteredRatings
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                    .map((item) => (
-                      <Card key={item.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300 cursor-pointer"
-                        onClick={() => { setSelectedDetail({ ...item, type: 'rating', activityDate: new Date(item.createdAt) }); setDetailDialogOpen(true); }}
-                      >
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex gap-2">
-                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">Calificación</Badge>
-                              <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                                ⭐ {typeof item.npsScore === 'number' ? item.npsScore.toFixed(1) : item.npsScore}
-                              </Badge>
-                            </div>
-                            <div className="text-xs text-siclo-dark/60 flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(item.createdAt).toLocaleDateString('es-ES')}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div className="flex items-center">
-                              <User className="h-4 w-4 mr-2 text-siclo-green" />
-                              <span className="font-medium text-siclo-dark">{item.instructorName}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Store className="h-4 w-4 mr-2 text-siclo-blue" />
-                              <span className="text-siclo-dark/70">{getBranchName(item.branchId)}</span>
-                            </div>
-                            <div className="text-siclo-dark/70">Instructor: {item.instructorName}</div>
-                          </div>
-                          <div className="mt-2 flex items-center space-x-4 text-xs text-siclo-dark/70">
-                            <span>NPS: {typeof item.npsScore === 'number' ? item.npsScore.toFixed(1) : item.npsScore}</span>
-                            <span>Instructor: {item.instructorRating}</span>
-                            <span>Limpieza: {item.cleanlinessRating}</span>
-                            <span>Audio: {item.audioRating}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  
-                  {filteredRatings.length === 0 && (
-                    <div className="text-center text-siclo-dark/60 py-12">
-                      <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No hay calificaciones que coincidan con los filtros</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-6 flex justify-center">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            href="#" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage > 1) setCurrentPage(currentPage - 1);
-                            }}
-                          />
-                        </PaginationItem>
-                        
-                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                          let page;
-                          if (totalPages <= 5) {
-                            page = i + 1;
-                          } else {
-                            const start = Math.max(1, currentPage - 2);
-                            page = start + i;
-                          }
-                          
-                          if (page <= totalPages) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    setCurrentPage(page);
-                                  }}
-                                  isActive={currentPage === page}
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <PaginationItem>
-                          <PaginationNext 
-                            href="#" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                            }}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+              <CardContent className="p-0">
+                {ratings.length === 0 ? (
+                  <div className="text-center text-siclo-dark/60 py-12">
+                    <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No hay calificaciones que coincidan con los filtros</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50/50">
+                          <TableHead className="w-[100px] text-xs font-medium">Fecha</TableHead>
+                          <TableHead className="text-xs font-medium">Instructor</TableHead>
+                          <TableHead className="text-xs font-medium hidden sm:table-cell">Sucursal</TableHead>
+                          <TableHead className="text-xs font-medium hidden md:table-cell">NPS</TableHead>
+                          <TableHead className="text-xs font-medium hidden lg:table-cell">Instructor Rating</TableHead>
+                          <TableHead className="text-xs font-medium hidden xl:table-cell">Limpieza</TableHead>
+                          <TableHead className="text-xs font-medium hidden xl:table-cell">Audio</TableHead>
+                          <TableHead className="w-[80px] text-xs font-medium">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ratings
+                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                          .map((item) => (
+                            <TableRow key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                              <TableCell className="text-xs text-gray-600">
+                                {new Date(item.createdAt).toLocaleDateString('es-ES', { 
+                                  day: '2-digit', 
+                                  month: '2-digit',
+                                  year: '2-digit'
+                                })}
+                              </TableCell>
+                              <TableCell className="font-medium text-sm max-w-[150px]">
+                                <div className="truncate" title={item.instructorName}>
+                                  {item.instructorName}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-600 hidden sm:table-cell">
+                                <div className="truncate max-w-[120px]" title={getBranchName(item.branchId)}>
+                                  {getBranchName(item.branchId)}
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <Badge className="bg-amber-100 text-amber-800 text-xs">
+                                  ⭐ {typeof item.npsScore === 'number' ? item.npsScore.toFixed(1) : item.npsScore}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-600 hidden lg:table-cell">
+                                {item.instructorRating}/5
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-600 hidden xl:table-cell">
+                                {item.cleanlinessRating}/5
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-600 hidden xl:table-cell">
+                                {item.audioRating}/5
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-[160px]">
+                                    <DropdownMenuItem onClick={() => handleViewDetail(item, 'rating')}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalle
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteRating(item.id)}
+                                      className="text-red-600"
+                                      disabled={deletingItem === item.id}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      {deletingItem === item.id ? 'Eliminando...' : 'Eliminar'}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
+
+
               </CardContent>
             </Card>
           </TabsContent>
+           
 
           <TabsContent value="managers" className="space-y-6">
             <div className="flex justify-end mb-4">
@@ -1116,68 +1319,208 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
             
-            <DashboardStats complaints={filteredComplaints} ratings={filteredRatings} />
+            <DashboardStats complaints={complaints} ratings={ratings} />
             
             <EmailMetadataDebug />
           </TabsContent>
         </Tabs>
       </div>
-      {/* Dialog de detalle reutilizado */}
+      {/* Dialog de detalle mejorado */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalle {selectedDetail?.type === 'complaint' ? 'de Queja' : 'de Calificación'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedDetail?.type === 'complaint' ? 'Detalle de Queja' : 'Detalle de Calificación'}
+              {selectedDetail?.type === 'complaint' && (
+                <Badge className={`${getStatusColor(selectedDetail.status)} text-xs`}>
+                  {getStatusText(selectedDetail.status)}
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {selectedDetail && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Badge>{selectedDetail.type === 'complaint' ? 'Queja' : 'Calificación'}</Badge>
-                {selectedDetail.type === 'complaint' && (
-                  <Badge className={getStatusColor(selectedDetail.status)}>{getStatusText(selectedDetail.status)}</Badge>
-                )}
+            <div className="space-y-6">
+              {/* Header con badges y fecha */}
+              <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
+                <Badge variant="outline" className="text-sm">
+                  {selectedDetail.type === 'complaint' ? 'Queja' : 'Calificación'}
+                </Badge>
                 {selectedDetail.type === 'rating' && (
                   <Badge className="bg-amber-100 text-amber-800 border-amber-200">
                     ⭐ {typeof selectedDetail.npsScore === 'number' ? selectedDetail.npsScore.toFixed(1) : selectedDetail.npsScore}
                   </Badge>
                 )}
-              </div>
-              <div className="text-xs text-siclo-dark/60 flex items-center">
-                <Calendar className="h-3 w-3 mr-1" />
-                {selectedDetail.activityDate.toLocaleDateString('es-ES')}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="font-medium">{selectedDetail.type === 'complaint' ? 'Nombre' : 'Instructor'}: </span>
-                  {selectedDetail.type === 'complaint' ? selectedDetail.fullName : selectedDetail.instructorName}
+                <div className="text-sm text-gray-500 flex items-center ml-auto">
+                  <Calendar className="h-4 w-4 mr-1" />
+                  {selectedDetail.activityDate.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </div>
-                <div>
-                  <span className="font-medium">Sucursal: </span>{getBranchName(selectedDetail.branchId)}
-                </div>
-                {selectedDetail.type === 'complaint' && (
-                  <div>
-                    <span className="font-medium">Tipo: </span>{selectedDetail.observationType}
+              </div>
+
+              {selectedDetail.type === 'complaint' ? (
+                /* Contenido de Queja */
+                <div className="space-y-6">
+                  {/* Información principal */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card className="p-4">
+                      <h4 className="font-semibold text-siclo-dark mb-3">Información del Usuario</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-siclo-green" />
+                          <span className="font-medium">{selectedDetail.fullName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-siclo-blue" />
+                          <span>{selectedDetail.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Store className="h-4 w-4 text-siclo-blue" />
+                          <span>{getBranchName(selectedDetail.branchId)}</span>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4">
+                      <h4 className="font-semibold text-siclo-dark mb-3">Información de la Queja</h4>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-600">Tipo:</span>
+                          <span className="ml-2">{selectedDetail.observationType}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-600">Prioridad:</span>
+                          <Badge 
+                            variant="outline" 
+                            className={`ml-2 text-xs ${
+                              selectedDetail.priority === ComplaintPriority.HIGH ? 'border-red-300 text-red-700' :
+                              selectedDetail.priority === ComplaintPriority.MEDIUM ? 'border-amber-300 text-amber-700' :
+                              'border-green-300 text-green-700'
+                            }`}
+                          >
+                            {getPriorityText(selectedDetail.priority)}
+                          </Badge>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-600">Estado:</span>
+                          <Badge className={`${getStatusColor(selectedDetail.status)} ml-2 text-xs`}>
+                            {getStatusText(selectedDetail.status)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
-                )}
-              </div>
-              {selectedDetail.type === 'complaint' && (
-                <div>
-                  <span className="font-medium">Detalle:</span>
-                  <div className="bg-gray-50 p-2 rounded mt-1 text-siclo-dark/80 text-sm">
-                    {selectedDetail.detail}
-                  </div>
+
+                  {/* Detalle de la queja */}
+                  <Card className="p-4">
+                    <h4 className="font-semibold text-siclo-dark mb-3">Detalle de la Queja</h4>
+                    <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 leading-relaxed">
+                      {selectedDetail.detail}
+                    </div>
+                  </Card>
+
+                  {/* Resolución si existe */}
+                  {selectedDetail.resolution && (
+                    <Card className="p-4 border-green-200 bg-green-50">
+                      <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Resolución
+                      </h4>
+                      <div className="bg-white p-4 rounded-lg text-sm text-gray-700 leading-relaxed border border-green-200">
+                        {selectedDetail.resolution}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Comentarios del manager si existen */}
+                  {selectedDetail.managerComments && (
+                    <Card className="p-4 border-blue-200 bg-blue-50">
+                      <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                        <MessageSquareText className="h-4 w-4" />
+                        Comentarios del Manager
+                      </h4>
+                      <div className="bg-white p-4 rounded-lg text-sm text-gray-700 leading-relaxed border border-blue-200">
+                        {selectedDetail.managerComments}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Attachments */}
+                  {(selectedDetail.attachments?.length > 0 || selectedDetail.resolutionAttachments?.length > 0) && (
+                    <Card className="p-4">
+                      <AttachmentsViewer
+                        attachments={selectedDetail.attachments || []}
+                        resolutionAttachments={selectedDetail.resolutionAttachments || []}
+                        title="Archivos Adjuntos"
+                      />
+                    </Card>
+                  )}
                 </div>
-              )}
-              {selectedDetail.type === 'rating' && (
-                <div className="grid grid-cols-2 gap-2 text-xs mt-2">
-                  <div><span className="font-medium">NPS:</span> {typeof selectedDetail.npsScore === 'number' ? selectedDetail.npsScore.toFixed(1) : selectedDetail.npsScore}</div>
-                  <div><span className="font-medium">Instructor:</span> {selectedDetail.instructorRating}</div>
-                  <div><span className="font-medium">Limpieza:</span> {selectedDetail.cleanlinessRating}</div>
-                  <div><span className="font-medium">Audio:</span> {selectedDetail.audioRating}</div>
-                  <div><span className="font-medium">Atención:</span> {selectedDetail.attentionQualityRating}</div>
-                  <div><span className="font-medium">Comodidades:</span> {selectedDetail.amenitiesRating}</div>
-                  <div><span className="font-medium">Puntualidad:</span> {selectedDetail.punctualityRating}</div>
+              ) : (
+                /* Contenido de Calificación */
+                <div className="space-y-6">
+                  {/* Información del instructor */}
+                  <Card className="p-4">
+                    <h4 className="font-semibold text-siclo-dark mb-3">Información de la Calificación</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-600">Instructor:</span>
+                        <span className="ml-2">{selectedDetail.instructorName}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-600">Sucursal:</span>
+                        <span className="ml-2">{getBranchName(selectedDetail.branchId)}</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Calificaciones */}
+                  <Card className="p-4">
+                    <h4 className="font-semibold text-siclo-dark mb-3">Calificaciones</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-amber-600">{selectedDetail.npsScore}</div>
+                        <div className="text-gray-600 text-xs">NPS Score</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-blue-600">{selectedDetail.instructorRating}/5</div>
+                        <div className="text-gray-600 text-xs">Instructor</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-green-600">{selectedDetail.cleanlinessRating}/5</div>
+                        <div className="text-gray-600 text-xs">Limpieza</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-purple-600">{selectedDetail.audioRating}/5</div>
+                        <div className="text-gray-600 text-xs">Audio</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-red-600">{selectedDetail.attentionQualityRating}/5</div>
+                        <div className="text-gray-600 text-xs">Atención</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-indigo-600">{selectedDetail.amenitiesRating}/5</div>
+                        <div className="text-gray-600 text-xs">Comodidades</div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-lg text-cyan-600">{selectedDetail.punctualityRating}/5</div>
+                        <div className="text-gray-600 text-xs">Puntualidad</div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Comentarios si existen */}
                   {selectedDetail.comments && (
-                    <div className="col-span-2"><span className="font-medium">Comentarios:</span> {selectedDetail.comments}</div>
+                    <Card className="p-4">
+                      <h4 className="font-semibold text-siclo-dark mb-3">Comentarios</h4>
+                      <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 leading-relaxed">
+                        {selectedDetail.comments}
+                      </div>
+                    </Card>
                   )}
                 </div>
               )}

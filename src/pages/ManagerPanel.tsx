@@ -292,12 +292,18 @@ const ManagerPanel = () => {
     return true;
   }).sort((a, b) => b.activityDate.getTime() - a.activityDate.getTime());
 
+    // Handle tab changes with URL navigation
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    navigate(`/manager?tab=${newTab}`);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
  
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm shadow-sm border border-gray-200 h-14">
             <TabsTrigger 
               value="activity" 

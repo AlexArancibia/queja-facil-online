@@ -261,10 +261,12 @@ export interface RegisterDto {
 // API Response interfaces
 export interface PaginatedResponse<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface ApiResponse<T> {
@@ -275,29 +277,32 @@ export interface ApiResponse<T> {
 
 export interface ComplaintStats {
   total: number;
-  pending: number;
-  inProgress: number;
-  resolved: number;
-  rejected: number;
+  byStatus: {
+    pending: number;
+    inProcess: number;
+    resolved: number;
+    rejected: number;
+  };
   byPriority: {
     high: number;
     medium: number;
     low: number;
   };
-  byBranch: Record<string, number>;
+  resolutionRate: number;
 }
 
 export interface RatingStats {
-  total: number;
-  averageRating: number;
-  averageNPS: number;
-  ratingsByInstructor: Record<string, number>;
-  ratingsByBranch: Record<string, number>;
-  disciplineStats: Record<string, {
-    count: number;
-    averageRating: number;
-    averageNPS: number;
-  }>;
+  totalRatings: number;
+  averages: {
+    instructor: number;
+    cleanliness: number;
+    audio: number;
+    attentionQuality: number;
+    amenities: number;
+    punctuality: number;
+    nps: number;
+    overall: number;
+  };
 }
 
 // Email DTOs
