@@ -89,7 +89,7 @@ const EditUserModal = ({ user, isOpen, onClose, onSave }: EditUserModalProps) =>
         <DialogHeader>
           <DialogTitle className="flex items-center text-siclo-dark">
             <User className="h-5 w-5 mr-2" />
-            Editar Manager
+            Editar Usuario
           </DialogTitle>
         </DialogHeader>
         

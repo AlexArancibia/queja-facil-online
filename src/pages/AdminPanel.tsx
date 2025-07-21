@@ -31,6 +31,7 @@ import RecentActivity from '@/components/RecentActivity';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmailMetadataDebug from '@/components/EmailMetadataDebug';
+import AnalyticsPanel from '@/components/AnalyticsPanel';
 import { 
   Pagination,
   PaginationContent,
@@ -65,7 +66,8 @@ import {
   Edit,
   Trash2,
   Eye,
-  MoreHorizontal
+  MoreHorizontal,
+  UserPlus
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import EditUserModal from '@/components/EditUserModal';
@@ -291,6 +293,8 @@ const AdminPanel = () => {
         return <Shield className="h-4 w-4" />;
       case UserRole.MANAGER:
         return <Building2 className="h-4 w-4" />;
+      case UserRole.SUPERVISOR:
+        return <Shield className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
     }
@@ -302,13 +306,17 @@ const AdminPanel = () => {
         return 'Administrador';
       case UserRole.MANAGER:
         return 'Manager';
+      case UserRole.SUPERVISOR:
+        return 'Supervisor';
       default:
         return 'Usuario';
     }
   };
 
-  // Filtrar solo managers para la sección de managers
-  const managers = users.filter(user => user.role === UserRole.MANAGER);
+  // Filtrar managers y supervisors para la sección de gestión de usuarios
+  const managementUsers = users.filter(user => 
+    user.role === UserRole.MANAGER || user.role === UserRole.SUPERVISOR
+  );
 
   // Estado para modal de edición
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
@@ -605,7 +613,7 @@ const AdminPanel = () => {
             </TabsTrigger>
             <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Users className="h-4 w-4 mr-2" />
-              Managers
+              Personal
             </TabsTrigger>
             <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <GraduationCap className="h-4 w-4 mr-2" />
@@ -1180,98 +1188,261 @@ const AdminPanel = () => {
            
 
           <TabsContent value="managers" className="space-y-6">
-            <div className="flex justify-end mb-4">
-              <Button className="bg-siclo-green text-white" onClick={() => setAddManagerModalOpen(true)}>
-                <Users className="h-4 w-4 mr-2" />Agregar manager
+            {/* Header optimizado para móvil y desktop */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm p-4 rounded-lg border border-siclo-light/30">
+              <div>
+                <h2 className="text-xl font-bold text-siclo-dark flex items-center">
+                  <Users className="h-5 w-5 mr-2" />
+                  Gestión de Personal
+                </h2>
+                <p className="text-sm text-siclo-dark/70 mt-1">
+                  Gestiona managers y supervisors del sistema ({managementUsers.length} usuarios)
+                </p>
+              </div>
+              <Button 
+                className="bg-siclo-green text-white hover:bg-siclo-green/90 w-full sm:w-auto" 
+                onClick={() => setAddManagerModalOpen(true)}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Agregar Usuario
               </Button>
             </div>
-              <Card className="siclo-card">
-                <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
-                  <CardTitle className="text-siclo-dark flex items-center">
-                    <Users className="h-5 w-5 mr-2" />
-                    Managers del Sistema ({managers.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {usersLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <LoadingSpinner size="sm" />
-                      <span className="ml-2 text-siclo-dark">Cargando usuarios...</span>
-                    </div>
-                  ) : managers.length > 0 ? (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {managers.map((user) => (
-                        <Card key={user.id} className="border border-siclo-light hover:shadow-lg transition-all duration-300">
-                          <CardContent className="pt-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Avatar className="h-10 w-10">
-                                  <AvatarImage src={user.image} alt={user.name} />
-                                  <AvatarFallback className="bg-siclo-green text-white">
-                                    {getInitials(user.name)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="flex items-center space-x-2">
-                                    <p className="font-medium text-siclo-dark">{user.name}</p>
-                                    <div className="flex items-center space-x-1">
-                                      {getRoleIcon(user.role)}
-                                      <Badge variant="outline" className="text-xs border-siclo-green text-siclo-green">
+
+            <Card className="siclo-card overflow-hidden">
+              <CardContent className="p-0">
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <LoadingSpinner size="sm" />
+                    <span className="ml-2 text-siclo-dark">Cargando usuarios...</span>
+                  </div>
+                ) : managementUsers.length > 0 ? (
+                  <>
+                    {/* Vista móvil - Cards */}
+                    <div className="lg:hidden">
+                      <div className="space-y-3 p-4">
+                        {managementUsers.map((user) => (
+                          <Card key={user.id} className="border border-siclo-light/50 hover:shadow-md transition-all duration-200">
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                {/* Header del usuario */}
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                    <Avatar className="h-10 w-10 border-2 border-siclo-green/20">
+                                      <AvatarImage src={user.image} alt={user.name} />
+                                      <AvatarFallback className="bg-siclo-green text-white font-medium">
+                                        {getInitials(user.name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <p className="font-semibold text-siclo-dark truncate">{user.name}</p>
+                                        <div className="flex items-center space-x-1">
+                                          {getRoleIcon(user.role)}
+                                        </div>
+                                      </div>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${
+                                          user.role === UserRole.MANAGER ? 'border-siclo-green text-siclo-green' :
+                                          user.role === UserRole.SUPERVISOR ? 'border-purple-400 text-purple-700' :
+                                          'border-gray-400 text-gray-700'
+                                        }`}
+                                      >
                                         {getRoleText(user.role)}
                                       </Badge>
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-4 text-sm text-siclo-dark/60">
-                                    <div className="flex items-center">
-                                      <Mail className="h-3 w-3 mr-1" />
-                                      {user.email}
-                                    </div>
-                                    {user.phone && (
-                                      <div className="flex items-center">
-                                        <Phone className="h-3 w-3 mr-1" />
-                                        {user.phone}
-                                      </div>
-                                    )}
+                                  <div className="flex gap-1">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-8 w-8" 
+                                      onClick={() => { setSelectedUser(user); setEditUserModalOpen(true); }} 
+                                      title="Editar"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" 
+                                      onClick={() => handleDeleteUser(user.id, user.name || user.email)} 
+                                      title="Eliminar"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
                                   </div>
+                                </div>
+
+                                {/* Información de contacto */}
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center text-siclo-dark/70">
+                                    <Mail className="h-3 w-3 mr-2 flex-shrink-0" />
+                                    <span className="truncate">{user.email}</span>
+                                  </div>
+                                  {user.phone && (
+                                    <div className="flex items-center text-siclo-dark/70">
+                                      <Phone className="h-3 w-3 mr-2 flex-shrink-0" />
+                                      <span>{user.phone}</span>
+                                    </div>
+                                  )}
                                   {user.branches && user.branches.length > 0 && (
-                                    <div className="flex items-center mt-1">
-                                      <Store className="h-3 w-3 mr-1 text-siclo-blue" />
-                                      <span className="text-xs text-siclo-dark/60">
+                                    <div className="flex items-center text-siclo-dark/70">
+                                      <Store className="h-3 w-3 mr-2 flex-shrink-0 text-siclo-blue" />
+                                      <span className="truncate text-xs">
                                         {user.branches.map(b => b.name).join(', ')}
                                       </span>
                                     </div>
                                   )}
                                 </div>
+
+                                {/* Footer */}
+                                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                                  <div className="text-xs text-siclo-dark/40">
+                                    {new Date(user.createdAt).toLocaleDateString('es-ES')}
+                                  </div>
+                                  <div className={`text-xs font-medium ${
+                                    user.isActive ? 'text-emerald-600' : 'text-red-600'
+                                  }`}>
+                                    {user.isActive ? '● Activo' : '● Inactivo'}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-right space-y-2">
-                                <p className="text-xs text-siclo-dark/40">
-                                  Creado: {new Date(user.createdAt).toLocaleDateString('es-ES')}
-                                </p>
-                                <p className={`text-xs ${user.isActive ? 'text-emerald-600' : 'text-red-600'}`}>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Vista desktop - Tabla */}
+                    <div className="hidden lg:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50/50">
+                            <TableHead className="font-semibold text-siclo-dark">Usuario</TableHead>
+                            <TableHead className="font-semibold text-siclo-dark">Rol</TableHead>
+                            <TableHead className="font-semibold text-siclo-dark">Contacto</TableHead>
+                            <TableHead className="font-semibold text-siclo-dark">Sucursales</TableHead>
+                            <TableHead className="font-semibold text-siclo-dark">Estado</TableHead>
+                            <TableHead className="font-semibold text-siclo-dark">Creado</TableHead>
+                            <TableHead className="w-[100px] font-semibold text-siclo-dark">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {managementUsers.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-gray-50/50">
+                              <TableCell>
+                                <div className="flex items-center space-x-3">
+                                  <Avatar className="h-8 w-8 border border-siclo-green/20">
+                                    <AvatarImage src={user.image} alt={user.name} />
+                                    <AvatarFallback className="bg-siclo-green text-white text-xs">
+                                      {getInitials(user.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium text-siclo-dark">{user.name}</p>
+                                    <p className="text-sm text-siclo-dark/60">{user.email}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  {getRoleIcon(user.role)}
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${
+                                      user.role === UserRole.MANAGER ? 'border-siclo-green text-siclo-green' :
+                                      user.role === UserRole.SUPERVISOR ? 'border-purple-400 text-purple-700' :
+                                      'border-gray-400 text-gray-700'
+                                    }`}
+                                  >
+                                    {getRoleText(user.role)}
+                                  </Badge>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {user.phone && (
+                                  <div className="flex items-center text-sm text-siclo-dark/70">
+                                    <Phone className="h-3 w-3 mr-1" />
+                                    {user.phone}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {user.branches && user.branches.length > 0 ? (
+                                  <div className="flex items-center text-sm text-siclo-dark/70">
+                                    <Store className="h-3 w-3 mr-1 text-siclo-blue" />
+                                    <span className="truncate max-w-[150px]">
+                                      {user.branches.map(b => b.name).join(', ')}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">Sin sucursal</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${
+                                    user.isActive 
+                                      ? 'border-emerald-300 text-emerald-700 bg-emerald-50' 
+                                      : 'border-red-300 text-red-700 bg-red-50'
+                                  }`}
+                                >
                                   {user.isActive ? 'Activo' : 'Inactivo'}
-                                </p>
-                                <div className="flex gap-2 justify-end">
-                                  <Button size="icon" variant="outline" onClick={() => { setSelectedUser(user); setEditUserModalOpen(true); }} title="Editar">
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm text-siclo-dark/60">
+                                  {new Date(user.createdAt).toLocaleDateString('es-ES')}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-8 w-8" 
+                                    onClick={() => { setSelectedUser(user); setEditUserModalOpen(true); }} 
+                                    title="Editar"
+                                  >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button size="icon" variant="destructive" onClick={() => handleDeleteUser(user.id, user.name || user.email)} title="Eliminar">
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" 
+                                    onClick={() => handleDeleteUser(user.id, user.name || user.email)} 
+                                    title="Eliminar"
+                                  >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  ) : (
-                    <div className="text-center text-siclo-dark/60 py-12">
-                      <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">No hay managers registrados</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </>
+                ) : (
+                  <div className="text-center text-siclo-dark/60 py-16">
+                    <Users className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                    <h3 className="text-lg font-medium mb-2">No hay usuarios registrados</h3>
+                    <p className="text-sm text-siclo-dark/50 mb-6">
+                      Comienza agregando managers y supervisors al sistema
+                    </p>
+                    <Button 
+                      className="bg-siclo-green text-white hover:bg-siclo-green/90" 
+                      onClick={() => setAddManagerModalOpen(true)}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Agregar Primer Usuario
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             {/* Modal de edición de usuario */}
             <EditUserModal
               user={selectedUser}
@@ -1279,13 +1450,17 @@ const AdminPanel = () => {
               onClose={() => { setEditUserModalOpen(false); setSelectedUser(null); }}
               onSave={handleUpdateUser}
             />
-            {/* Modal de creación de manager */}
+            {/* Modal de creación de usuario */}
             <Dialog open={addManagerModalOpen} onOpenChange={setAddManagerModalOpen}>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center text-siclo-dark">
-                    <Users className="h-5 w-5 mr-2" />Agregar Manager
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="flex items-center text-siclo-dark text-xl">
+                    <UserPlus className="h-6 w-6 mr-3 text-siclo-green" />
+                    Agregar Usuario al Sistema
                   </DialogTitle>
+                  <p className="text-sm text-siclo-dark/70 mt-2">
+                    Crea un nuevo manager o supervisor para gestionar el sistema
+                  </p>
                 </DialogHeader>
                 <AddManagerForm onManagerAdded={() => { setAddManagerModalOpen(false); loadData(); }} />
               </DialogContent>
@@ -1301,27 +1476,7 @@ const AdminPanel = () => {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-            {/* Date Range Filter for Analytics */}
-            <Card className="siclo-card border-2 border-siclo-light/30">
-              <CardHeader>
-                <CardTitle className="flex items-center text-siclo-dark">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Filtrar Analíticas por Rango de Fechas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DateRangeFilter
-                  startDate={startDate}
-                  endDate={endDate}
-                  onStartDateChange={setStartDate}
-                  onEndDateChange={setEndDate}
-                />
-              </CardContent>
-            </Card>
-            
-            <DashboardStats complaints={complaints} ratings={ratings} />
-            
-            <EmailMetadataDebug />
+            <AnalyticsPanel />
           </TabsContent>
         </Tabs>
       </div>

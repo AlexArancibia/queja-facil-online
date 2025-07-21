@@ -34,6 +34,7 @@ const Login = () => {
           navigate('/admin');
           break;
         case UserRole.MANAGER:
+        case UserRole.SUPERVISOR:
           navigate('/manager');
           break;
         default:

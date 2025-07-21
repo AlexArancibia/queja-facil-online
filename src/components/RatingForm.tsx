@@ -27,7 +27,6 @@ import { emailConfig } from '@/lib/envConfig';
 import { getBranchEmailMetadataSync } from '@/lib/emailHelpers';
 
 const ratingSchema = z.object({
-  email: z.string().email('Correo electrónico inválido').min(1, 'El correo es requerido'),
   branchId: z.string().min(1, 'Selecciona un local'),
   instructorId: z.string().min(1, 'Selecciona un instructor'),
   date: z.string().min(1, 'Ingresa la fecha de la clase'),
@@ -91,7 +90,6 @@ const RatingForm = () => {
       const instructor = instructors.find(i => i.id === data.instructorId);
       
       const newRating: CreateRatingDto = {
-        email: data.email,
         instructorId: data.instructorId,
         branchId: data.branchId,
         instructorName: instructor?.name || '',
@@ -111,38 +109,10 @@ const RatingForm = () => {
       const createdRating = await createRating(newRating);
       setSubmitted(true);
 
-      // Enviar email de confirmación
-      try {
-        const selectedBranchData = branches.find(b => b.id === data.branchId);
-        const branchName = selectedBranchData?.name || 'Local';
-        const instructorName = instructor?.name || 'Instructor';
-        
-        const emailHtml = generateRatingConfirmationEmail(createdRating, branchName, instructorName);
-        
-        // Obtener metadata del branch y managers
-        const metadata = getBranchEmailMetadataSync(data.branchId, 'rating', createdRating.id);
-        
-        await sendEmail({
-          to: data.email,
-          subject: `⭐ Calificación Registrada - Gracias por tu feedback`,
-          html: emailHtml,
-          from: {
-            name: emailConfig.fromName,
-            address: emailConfig.fromAddress
-          },
-          metadata
-        });
-
-        console.log('✅ Email de confirmación de rating enviado exitosamente');
-      } catch (emailError) {
-        console.error('❌ Error enviando email de confirmación:', emailError);
-        // No mostramos error al usuario ya que el rating se registró exitosamente
-      }
-
       // Mostrar mensaje de éxito
       toast({
         title: "¡Calificación registrada exitosamente!",
-        description: "Gracias por tu feedback. Te hemos enviado un email de confirmación.",
+        description: "Gracias por tu feedback.",
       });
 
     } catch (error: any) {
@@ -254,20 +224,7 @@ const RatingForm = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-      {/* Email Field */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium text-slate-800 flex items-center">
-          <Mail className="h-4 w-4 mr-2 text-siclo-green" />
-          Correo Electrónico *
-        </Label>
-        <Input
-          type="email"
-          {...register('email')}
-          placeholder="tu@email.com"
-          className="border-border focus:border-border focus:ring-siclo-green/20 text-sm"
-        />
-        {errors.email && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.email.message}</p>}
-      </div>
+      {/* Email Field eliminado */}
 
       {/* Branch and Instructor Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">

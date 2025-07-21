@@ -35,7 +35,7 @@ const App = () => (
           
           {/* Rutas protegidas solo para paneles administrativos */}
           <Route path="/manager" element={
-            <ProtectedRoute requiredRole={UserRole.MANAGER}>
+            <ProtectedRoute allowedRoles={[UserRole.MANAGER, UserRole.SUPERVISOR]}>
               <ManagerPanel />
             </ProtectedRoute>
           } />

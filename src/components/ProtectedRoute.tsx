@@ -7,12 +7,14 @@ import LoadingSpinner from './LoadingSpinner';
 interface ProtectedRouteProps {
   children: ReactNode;
   requiredRole?: UserRole;
+  allowedRoles?: UserRole[];
   fallbackPath?: string;
 }
 
 const ProtectedRoute = ({ 
   children, 
   requiredRole, 
+  allowedRoles,
   fallbackPath = '/login' 
 }: ProtectedRouteProps) => {
   const navigate = useNavigate();
@@ -28,10 +30,17 @@ const ProtectedRoute = ({
         return;
       }
 
-      if (requiredRole && user.role !== requiredRole) {
+      const hasPermission = allowedRoles 
+        ? allowedRoles.includes(user.role)
+        : requiredRole 
+          ? user.role === requiredRole 
+          : true;
+
+      if ((requiredRole || allowedRoles) && !hasPermission) {
         console.log('🚫 Usuario no tiene permisos suficientes', {
           userRole: user.role,
-          requiredRole
+          requiredRole,
+          allowedRoles
         });
         
         // Redirigir según el rol del usuario
@@ -40,6 +49,7 @@ const ProtectedRoute = ({
             navigate('/admin');
             break;
           case UserRole.MANAGER:
+          case UserRole.SUPERVISOR:
             navigate('/manager');
             break;
           default:
@@ -67,7 +77,13 @@ const ProtectedRoute = ({
   }
 
   // Si no tiene el rol requerido, no mostrar nada (se redirigirá)
-  if (requiredRole && user.role !== requiredRole) {
+  const hasPermission = allowedRoles 
+    ? allowedRoles.includes(user.role)
+    : requiredRole 
+      ? user.role === requiredRole 
+      : true;
+
+  if ((requiredRole || allowedRoles) && !hasPermission) {
     return null;
   }
 

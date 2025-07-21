@@ -52,6 +52,8 @@ const Navbar = () => {
         return <Shield className="h-4 w-4" />;
       case UserRole.MANAGER:
         return <Building2 className="h-4 w-4" />;
+      case UserRole.SUPERVISOR:
+        return <Shield className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
     }
@@ -63,6 +65,8 @@ const Navbar = () => {
         return 'Administrador';
       case UserRole.MANAGER:
         return 'Manager';
+      case UserRole.SUPERVISOR:
+        return 'Supervisor';
       default:
         return 'Usuario';
     }
@@ -74,6 +78,8 @@ const Navbar = () => {
         return '/admin';
       case UserRole.MANAGER:
         return '/manager';
+      case UserRole.SUPERVISOR:
+        return '/manager'; // Los supervisors también usan el panel de manager
       default:
         return '/';
     }
@@ -105,7 +111,7 @@ const Navbar = () => {
     // Si no hay tab específico en la URL, usar valores por defecto
     if (!currentTab) {
       if (location.pathname === '/admin' && tabValue === 'complaints') return true;
-      if (location.pathname === '/manager' && tabValue === 'activity') return true;
+      if (location.pathname === '/manager' && tabValue === 'complaints') return true;
       return false;
     }
     
@@ -196,7 +202,7 @@ const Navbar = () => {
                               className={getMobileLinkClasses(location.pathname === '/admin' && isCurrentTab('managers'))}
                             >
                               <User className="h-5 w-5" />
-                              <span className="text-sm">Managers</span>
+                              <span className="text-sm">Personal</span>
                             </button>
                             <button
                               onClick={() => handleNavigation('/admin?tab=instructors')}
@@ -222,15 +228,22 @@ const Navbar = () => {
                           </>
                         )}
 
-                        {/* Navegación específica para Manager */}
-                        {user?.role === UserRole.MANAGER && (
+                        {/* Navegación específica para Manager y Supervisor */}
+                        {(user?.role === UserRole.MANAGER || user?.role === UserRole.SUPERVISOR) && (
                           <>
                             <button
-                              onClick={() => handleNavigation('/manager?tab=activity')}
-                              className={getMobileLinkClasses(location.pathname === '/manager' && isCurrentTab('activity'))}
+                              onClick={() => handleNavigation('/manager?tab=complaints')}
+                              className={getMobileLinkClasses(location.pathname === '/manager' && isCurrentTab('complaints'))}
                             >
-                              <Activity className="h-5 w-5" />
-                              <span className="text-sm">Actividad</span>
+                              <MessageSquareText className="h-5 w-5" />
+                              <span className="text-sm">Quejas</span>
+                            </button>
+                            <button
+                              onClick={() => handleNavigation('/manager?tab=ratings')}
+                              className={getMobileLinkClasses(location.pathname === '/manager' && isCurrentTab('ratings'))}
+                            >
+                              <Star className="h-5 w-5" />
+                              <span className="text-sm">Calificaciones</span>
                             </button>
                             <button
                               onClick={() => handleNavigation('/manager?tab=stats')}
@@ -243,7 +256,7 @@ const Navbar = () => {
                         )}
 
                         {/* Para otros usuarios autenticados (si los hay) */}
-                        {user?.role !== UserRole.ADMIN && user?.role !== UserRole.MANAGER && (
+                        {user?.role !== UserRole.ADMIN && user?.role !== UserRole.MANAGER && user?.role !== UserRole.SUPERVISOR && (
                           <button
                             onClick={() => handleNavigation('/')}
                             className={getMobileLinkClasses(isCurrentPath('/'))}
