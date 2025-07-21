@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { useBranchesStore } from '@/stores/branchesStore';
+import { type Branch, type CreateBranchDto, type UpdateBranchDto } from '@/types/api';
 import { 
   Store, 
   Plus, 
@@ -16,47 +18,37 @@ import {
   Edit3, 
   Trash2,
   Save,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
-
-interface Store {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  manager: string;
-  hours: string;
-  status: 'active' | 'inactive';
-}
 
 const StoreManagement = () => {
   const { toast } = useToast();
-  const [stores, setStores] = useState<Store[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingStore, setEditingStore] = useState<string | null>(null);
+  const [editingBranch, setEditingBranch] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
     phone: '',
-    manager: '',
-    hours: '',
-    status: 'active' as 'active' | 'inactive'
+    email: '',
+    isActive: true
   });
 
+  // Store
+  const { 
+    branches, 
+    loading, 
+    fetchBranches, 
+    createBranch, 
+    updateBranch, 
+    deleteBranch 
+  } = useBranchesStore();
+
   useEffect(() => {
-    loadStores();
-  }, []);
+    fetchBranches();
+  }, [fetchBranches]);
 
-  const loadStores = () => {
-    const existingStores = JSON.parse(localStorage.getItem('stores') || '[]');
-    setStores(existingStores);
-  };
-
-  const generateStoreId = () => {
-    return `store-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  };
-
-  const saveStore = () => {
+  const saveBranch = async () => {
     if (!formData.name || !formData.address) {
       toast({
         title: "Error",
@@ -66,54 +58,69 @@ const StoreManagement = () => {
       return;
     }
 
-    const updatedStores = [...stores];
-    
-    if (editingStore) {
-      const index = updatedStores.findIndex(s => s.id === editingStore);
-      if (index !== -1) {
-        updatedStores[index] = { ...updatedStores[index], ...formData };
+    try {
+      if (editingBranch) {
+        const updateData: UpdateBranchDto = {
+          name: formData.name,
+          address: formData.address,
+          phone: formData.phone || undefined,
+          email: formData.email || undefined,
+          isActive: formData.isActive
+        };
+        await updateBranch(editingBranch, updateData);
+        toast({
+          title: "Sucursal actualizada",
+          description: "Los datos de la sucursal han sido actualizados correctamente",
+        });
+      } else {
+        const createData: CreateBranchDto = {
+          name: formData.name,
+          address: formData.address,
+          phone: formData.phone || undefined,
+          email: formData.email || undefined,
+          isActive: formData.isActive
+        };
+        await createBranch(createData);
+        toast({
+          title: "Sucursal agregada",
+          description: "La nueva sucursal ha sido registrada correctamente",
+        });
       }
+      resetForm();
+    } catch (error: any) {
       toast({
-        title: "Local actualizado",
-        description: "Los datos del local han sido actualizados correctamente",
-      });
-    } else {
-      const newStore: Store = {
-        id: generateStoreId(),
-        ...formData
-      };
-      updatedStores.push(newStore);
-      toast({
-        title: "Local agregado",
-        description: "El nuevo local ha sido registrado correctamente",
+        title: "Error",
+        description: error.message || "Error al guardar la sucursal",
+        variant: "destructive",
       });
     }
-
-    localStorage.setItem('stores', JSON.stringify(updatedStores));
-    setStores(updatedStores);
-    resetForm();
   };
 
-  const deleteStore = (storeId: string) => {
-    const updatedStores = stores.filter(s => s.id !== storeId);
-    localStorage.setItem('stores', JSON.stringify(updatedStores));
-    setStores(updatedStores);
-    toast({
-      title: "Local eliminado",
-      description: "El local ha sido eliminado del sistema",
-    });
+  const handleDeleteBranch = async (branchId: string) => {
+    try {
+      await deleteBranch(branchId);
+      toast({
+        title: "Sucursal eliminada",
+        description: "La sucursal ha sido eliminada del sistema",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Error al eliminar la sucursal",
+        variant: "destructive",
+      });
+    }
   };
 
-  const startEdit = (store: Store) => {
+  const startEdit = (branch: Branch) => {
     setFormData({
-      name: store.name,
-      address: store.address,
-      phone: store.phone,
-      manager: store.manager,
-      hours: store.hours,
-      status: store.status
+      name: branch.name,
+      address: branch.address,
+      phone: branch.phone || '',
+      email: branch.email || '',
+      isActive: branch.isActive
     });
-    setEditingStore(store.id);
+    setEditingBranch(branch.id);
     setShowAddForm(true);
   };
 
@@ -122,25 +129,33 @@ const StoreManagement = () => {
       name: '',
       address: '',
       phone: '',
-      manager: '',
-      hours: '',
-      status: 'active'
+      email: '',
+      isActive: true
     });
     setShowAddForm(false);
-    setEditingStore(null);
+    setEditingBranch(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-siclo-green" />
+        <span className="ml-2 text-siclo-dark">Cargando sucursales...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Add Store Button */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-siclo-dark">Gestión de Locales</h3>
+        <h3 className="text-lg font-semibold text-siclo-dark">Gestión de Sucursales</h3>
         <Button
           onClick={() => setShowAddForm(true)}
           className="siclo-button"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Agregar Local
+          Agregar Sucursal
         </Button>
       </div>
 
@@ -150,13 +165,13 @@ const StoreManagement = () => {
           <CardHeader className="bg-gradient-to-r from-siclo-green/5 to-siclo-blue/5">
             <CardTitle className="text-siclo-dark flex items-center">
               <Store className="h-5 w-5 mr-2" />
-              {editingStore ? 'Editar Local' : 'Agregar Nuevo Local'}
+              {editingBranch ? 'Editar Sucursal' : 'Agregar Nueva Sucursal'}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name" className="text-siclo-dark font-medium">Nombre del Local *</Label>
+                <Label htmlFor="name" className="text-siclo-dark font-medium">Nombre de la Sucursal *</Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -183,43 +198,45 @@ const StoreManagement = () => {
                 id="address"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Dirección completa del local"
+                placeholder="Dirección completa de la sucursal"
                 className="border-siclo-light"
                 rows={3}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="manager" className="text-siclo-dark font-medium">Manager Asignado</Label>
-                <Input
-                  id="manager"
-                  value={formData.manager}
-                  onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                  placeholder="Nombre del manager"
-                  className="border-siclo-light"
-                />
-              </div>
-              <div>
-                <Label htmlFor="hours" className="text-siclo-dark font-medium">Horario de Atención</Label>
-                <Input
-                  id="hours"
-                  value={formData.hours}
-                  onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                  placeholder="Ej: Lun-Vie 9:00-18:00"
-                  className="border-siclo-light"
-                />
-              </div>
+            <div>
+              <Label htmlFor="email" className="text-siclo-dark font-medium">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="sucursal@siclo.com"
+                className="border-siclo-light"
+              />
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <Button variant="outline" onClick={resetForm}>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={formData.isActive}
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                className="rounded border-siclo-light"
+              />
+              <Label htmlFor="isActive" className="text-siclo-dark font-medium">
+                Sucursal Activa
+              </Label>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button onClick={saveBranch} className="siclo-button">
+                <Save className="h-4 w-4 mr-2" />
+                {editingBranch ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button onClick={resetForm} variant="outline" className="border-siclo-light">
                 <X className="h-4 w-4 mr-2" />
                 Cancelar
-              </Button>
-              <Button onClick={saveStore} className="siclo-button">
-                <Save className="h-4 w-4 mr-2" />
-                {editingStore ? 'Actualizar' : 'Guardar'}
               </Button>
             </div>
           </CardContent>
@@ -228,85 +245,82 @@ const StoreManagement = () => {
 
       {/* Stores List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stores.map((store) => (
-          <Card key={store.id} className="siclo-card hover:shadow-xl transition-all duration-300">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-siclo-green to-siclo-blue rounded-lg flex items-center justify-center">
-                    <Store className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-siclo-dark">{store.name}</h4>
-                    <Badge 
-                      className={store.status === 'active' 
-                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
-                        : 'bg-red-100 text-red-800 border-red-200'
-                      }
-                    >
-                      {store.status === 'active' ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </div>
+        {branches.map((branch) => (
+          <Card key={branch.id} className="siclo-card hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center space-x-2">
+                  <Store className="h-5 w-5 text-siclo-green" />
+                  <CardTitle className="text-lg text-siclo-dark">{branch.name}</CardTitle>
                 </div>
-                <div className="flex space-x-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => startEdit(store)}
-                    className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white"
-                  >
-                    <Edit3 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => deleteStore(store.id)}
-                    className="border-red-300 text-red-600 hover:bg-red-600 hover:text-white"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
+                <Badge 
+                  variant={branch.isActive ? "default" : "secondary"}
+                  className={branch.isActive ? "bg-siclo-green/10 text-siclo-green" : "bg-gray-100 text-gray-600"}
+                >
+                  {branch.isActive ? 'Activa' : 'Inactiva'}
+                </Badge>
               </div>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center text-siclo-dark/70">
-                  <MapPin className="h-4 w-4 mr-2 text-siclo-blue" />
-                  <span className="truncate">{store.address}</span>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-start space-x-2">
+                <MapPin className="h-4 w-4 text-siclo-blue mt-0.5" />
+                <p className="text-sm text-siclo-dark/70">{branch.address}</p>
+              </div>
+              
+              {branch.phone && (
+                <div className="flex items-center space-x-2">
+                  <Phone className="h-4 w-4 text-siclo-blue" />
+                  <p className="text-sm text-siclo-dark/70">{branch.phone}</p>
                 </div>
-                
-                {store.phone && (
-                  <div className="flex items-center text-siclo-dark/70">
-                    <Phone className="h-4 w-4 mr-2 text-siclo-green" />
-                    <span>{store.phone}</span>
-                  </div>
-                )}
-                
-                {store.hours && (
-                  <div className="flex items-center text-siclo-dark/70">
-                    <Clock className="h-4 w-4 mr-2 text-siclo-blue" />
-                    <span>{store.hours}</span>
-                  </div>
-                )}
+              )}
 
-                {store.manager && (
-                  <div className="bg-siclo-light/50 rounded-lg p-2 mt-3">
-                    <p className="text-xs text-siclo-dark/60 font-medium">Manager:</p>
-                    <p className="text-sm text-siclo-dark font-medium">{store.manager}</p>
-                  </div>
-                )}
+              {branch.email && (
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-siclo-blue" />
+                  <p className="text-sm text-siclo-dark/70">{branch.email}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => startEdit(branch)}
+                  variant="outline"
+                  size="sm"
+                  className="border-siclo-green/30 text-siclo-green hover:bg-siclo-green hover:text-white"
+                >
+                  <Edit3 className="h-3 w-3 mr-1" />
+                  Editar
+                </Button>
+                <Button
+                  onClick={() => handleDeleteBranch(branch.id)}
+                  variant="outline"
+                  size="sm"
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Eliminar
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
-        
-        {stores.length === 0 && (
-          <div className="col-span-full text-center text-siclo-dark/60 py-12">
-            <Store className="h-16 w-16 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">No hay locales registrados</p>
-            <p className="text-sm">Agrega el primer local para comenzar</p>
-          </div>
-        )}
       </div>
+
+      {branches.length === 0 && !loading && (
+        <Card className="siclo-card">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <Store className="h-12 w-12 text-siclo-green/50 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-siclo-dark mb-2">
+                No hay sucursales registradas
+              </h3>
+              <p className="text-siclo-dark/60">
+                Comienza agregando la primera sucursal al sistema.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

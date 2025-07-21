@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import apiClient from '@/lib/api';
 import { 
@@ -6,7 +5,9 @@ import {
   type CreateComplaintDto, 
   type UpdateComplaintDto,
   type PaginatedResponse,
-  type ComplaintStats
+  type ComplaintStats,
+  type ComplaintStatus,
+  type ComplaintPriority
 } from '@/types/api';
 
 interface ComplaintsState {
@@ -21,64 +22,20 @@ interface ComplaintsState {
   };
   
   // Actions
-  fetchComplaints: (params?: { page?: number; limit?: number; branchId?: string; status?: string; priority?: string }) => Promise<void>;
-  createComplaint: (complaint: CreateComplaintDto) => Promise<string>;
-  updateComplaint: (id: string, updates: UpdateComplaintDto) => Promise<void>;
+  fetchComplaints: (params?: {
+    page?: number;
+    limit?: number;
+    branchId?: string;
+    status?: ComplaintStatus;
+    priority?: ComplaintPriority;
+  }) => Promise<void>;
+  
+  createComplaint: (complaint: CreateComplaintDto) => Promise<Complaint>;
+  updateComplaint: (id: string, updates: UpdateComplaintDto) => Promise<Complaint>;
   deleteComplaint: (id: string) => Promise<void>;
-  searchComplaints: (email: string, complaintId?: string) => Promise<Complaint[]>;
   getComplaintStats: (branchId?: string) => Promise<ComplaintStats>;
   getComplaintById: (id: string) => Promise<Complaint>;
 }
-
-// API functions
-const api = {
-  async getComplaints(params?: { page?: number; limit?: number; branchId?: string; status?: string; priority?: string }): Promise<PaginatedResponse<Complaint>> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.branchId) searchParams.append('branchId', params.branchId);
-    if (params?.status) searchParams.append('status', params.status);
-    if (params?.priority) searchParams.append('priority', params.priority);
-    
-    const response = await apiClient.get(`/complaints?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async createComplaint(complaint: CreateComplaintDto): Promise<{ id: string }> {
-    const response = await apiClient.post('/complaints', complaint);
-    return response.data;
-  },
-
-  async updateComplaint(id: string, updates: UpdateComplaintDto): Promise<void> {
-    await apiClient.patch(`/complaints/${id}`, updates);
-  },
-
-  async deleteComplaint(id: string): Promise<void> {
-    await apiClient.delete(`/complaints/${id}`);
-  },
-
-  async searchComplaints(email: string, complaintId?: string): Promise<Complaint[]> {
-    const searchParams = new URLSearchParams();
-    searchParams.append('email', email);
-    if (complaintId) searchParams.append('id', complaintId);
-    
-    const response = await apiClient.get(`/complaints?${searchParams.toString()}`);
-    return response.data.data || [];
-  },
-
-  async getComplaintStats(branchId?: string): Promise<ComplaintStats> {
-    const searchParams = new URLSearchParams();
-    if (branchId) searchParams.append('branchId', branchId);
-    
-    const response = await apiClient.get(`/complaints/stats?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async getComplaintById(id: string): Promise<Complaint> {
-    const response = await apiClient.get(`/complaints/${id}`);
-    return response.data;
-  }
-};
 
 export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
   complaints: [],
@@ -91,34 +48,63 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
     totalPages: 0
   },
 
-  fetchComplaints: async (params) => {
+  fetchComplaints: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.getComplaints(params);
+      const { page = 1, limit = 10, branchId, status, priority } = params;
+      
+      const searchParams = new URLSearchParams();
+      searchParams.append('page', page.toString());
+      searchParams.append('limit', limit.toString());
+      if (branchId) searchParams.append('branchId', branchId);
+      if (status) searchParams.append('status', status);
+      if (priority) searchParams.append('priority', priority);
+      
+      const response = await apiClient.get<PaginatedResponse<Complaint>>(
+        `/complaints?${searchParams.toString()}`
+      );
+      
       set({ 
-        complaints: response.data,
+        complaints: response.data.data,
         pagination: {
-          page: response.page,
-          limit: response.limit,
-          total: response.total,
-          totalPages: response.totalPages
+          page: response.data.page,
+          limit: response.data.limit,
+          total: response.data.total,
+          totalPages: response.data.totalPages
         },
         loading: false 
       });
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al cargar las quejas', loading: false });
+      set({ 
+        error: error.response?.data?.message || 'Error al cargar las quejas', 
+        loading: false 
+      });
+      throw error;
     }
   },
 
   createComplaint: async (complaint) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.createComplaint(complaint);
-      await get().fetchComplaints(); // Refresh the list
+      console.log('📝 PAYLOAD QUEJA RECIBIDO:', JSON.stringify(complaint, null, 2));
+      console.log('📤 Enviando queja como JSON...');
+      
+      const response = await apiClient.post<Complaint>('/complaints', complaint);
+      console.log('✅ Queja creada exitosamente:', response.data);
+      
+      await get().fetchComplaints({
+        page: get().pagination.page,
+        limit: get().pagination.limit
+      });
       set({ loading: false });
-      return response.id;
+      return response.data;
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al crear la queja', loading: false });
+      console.error('❌ Error creando queja:', error);
+      console.error('❌ Error response:', error.response?.data);
+      set({ 
+        error: error.response?.data?.message || 'Error al crear la queja', 
+        loading: false 
+      });
       throw error;
     }
   },
@@ -126,11 +112,19 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
   updateComplaint: async (id, updates) => {
     set({ loading: true, error: null });
     try {
-      await api.updateComplaint(id, updates);
-      await get().fetchComplaints();
+      const response = await apiClient.patch<Complaint>(`/complaints/${id}`, updates);
+      // Refresh the list with current pagination
+      await get().fetchComplaints({
+        page: get().pagination.page,
+        limit: get().pagination.limit
+      });
       set({ loading: false });
+      return response.data;
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al actualizar la queja', loading: false });
+      set({ 
+        error: error.response?.data?.message || 'Error al actualizar la queja', 
+        loading: false 
+      });
       throw error;
     }
   },
@@ -138,39 +132,53 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
   deleteComplaint: async (id) => {
     set({ loading: true, error: null });
     try {
-      await api.deleteComplaint(id);
-      await get().fetchComplaints();
+      await apiClient.delete(`/complaints/${id}`);
+      // Refresh the list with current pagination
+      await get().fetchComplaints({
+        page: get().pagination.page,
+        limit: get().pagination.limit
+      });
       set({ loading: false });
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al eliminar la queja', loading: false });
-      throw error;
-    }
-  },
-
-  searchComplaints: async (email, complaintId) => {
-    set({ loading: true, error: null });
-    try {
-      const results = await api.searchComplaints(email, complaintId);
-      set({ loading: false });
-      return results;
-    } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al buscar quejas', loading: false });
+      set({ 
+        error: error.response?.data?.message || 'Error al eliminar la queja', 
+        loading: false 
+      });
       throw error;
     }
   },
 
   getComplaintStats: async (branchId) => {
+    set({ loading: true, error: null });
     try {
-      return await api.getComplaintStats(branchId);
+      const searchParams = new URLSearchParams();
+      if (branchId) searchParams.append('branchId', branchId);
+      
+      const response = await apiClient.get<ComplaintStats>(
+        `/complaints/stats?${searchParams.toString()}`
+      );
+      set({ loading: false });
+      return response.data;
     } catch (error: any) {
+      set({ 
+        error: error.response?.data?.message || 'Error al obtener estadísticas', 
+        loading: false 
+      });
       throw error;
     }
   },
 
   getComplaintById: async (id) => {
+    set({ loading: true, error: null });
     try {
-      return await api.getComplaintById(id);
+      const response = await apiClient.get<Complaint>(`/complaints/${id}`);
+      set({ loading: false });
+      return response.data;
     } catch (error: any) {
+      set({ 
+        error: error.response?.data?.message || 'Error al obtener la queja', 
+        loading: false 
+      });
       throw error;
     }
   }

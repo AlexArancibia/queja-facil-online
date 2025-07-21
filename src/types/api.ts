@@ -32,6 +32,12 @@ export enum Discipline {
   YOGA = 'YOGA'
 }
 
+// Attachment interface
+export interface Attachment {
+  filename: string;
+  url: string;
+}
+
 // API DTOs
 export interface User {
   id: string;
@@ -50,6 +56,7 @@ export interface User {
   failedLoginAttempts?: number;
   lockedUntil?: Date;
   isActive: boolean;
+  branches:Branch[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,8 +96,8 @@ export interface Complaint {
   status: ComplaintStatus;
   resolution?: string;
   managerComments?: string;
-  attachments: any[];
-  resolutionAttachments: any[];
+  attachments: Attachment[];
+  resolutionAttachments: Attachment[];
   createdAt: Date;
   updatedAt: Date;
   branch?: Branch;
@@ -125,7 +132,7 @@ export interface CreateComplaintDto {
   observationType: string;
   detail: string;
   priority: ComplaintPriority;
-  attachments?: any[];
+  attachments?: Attachment[];
 }
 
 export interface UpdateComplaintDto {
@@ -138,11 +145,12 @@ export interface UpdateComplaintDto {
   status?: ComplaintStatus;
   resolution?: string;
   managerComments?: string;
-  attachments?: any[];
-  resolutionAttachments?: any[];
+  attachments?: Attachment[];
+  resolutionAttachments?: Attachment[];
 }
 
 export interface CreateRatingDto {
+  email?: string;
   instructorId: string;
   branchId: string;
   instructorName: string;
@@ -290,4 +298,37 @@ export interface RatingStats {
     averageRating: number;
     averageNPS: number;
   }>;
+}
+
+// Email DTOs
+export interface SendEmailDto {
+  to: string;
+  subject: string;
+  html: string;
+  from?: {
+    name?: string;
+    address?: string;
+  };
+  metadata?: {
+    branchId?: string;
+    branchName?: string;
+    managers?: Array<{
+      id: string;
+      name: string;
+      email: string;
+    }>;
+    type?: 'complaint' | 'rating' | 'status_update';
+    entityId?: string;
+  };
+}
+
+export interface FormSubmissionDto {
+  html?: string;
+  [key: string]: string | undefined; // permite cualquier otro campo además de html
+}
+
+export interface EmailResponse {
+  success: boolean;
+  message: string;
+  error?: string;
 }

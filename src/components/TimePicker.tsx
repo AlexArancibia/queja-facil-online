@@ -31,7 +31,7 @@ const TimePicker = ({ value, onValueChange, placeholder = "Selecciona una hora" 
 
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className="border-siclo-light/50 focus:border-siclo-green">
+      <SelectTrigger className="border-border focus:border-siclo-green">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design system with DM Sans font and Siclo brand colors */
+/* Design system with Poppins font and Siclo brand colors */
 
 @layer base {
   :root {
@@ -46,11 +46,16 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 147 27% 40%;
 
-    /* Siclo brand colors */
     --siclo-green: 147 27% 40%;
     --siclo-blue: 210 54% 29%;
-    --siclo-light: 220 14% 96%;
+    --siclo-light: 24 0% 97%;
     --siclo-dark: 210 54% 20%;
+
+    /* Colores del degradado "Siclo PRIME" */
+    --siclo-yellow: 39 97% 61%;   /* #FBB040 */
+    --siclo-orange: 18 87% 61%;   /* #F47B48 */
+    --siclo-purple: 317 34% 43%;  /* #9B4C8A */
+    --siclo-deep-blue: 211 53% 36%; /* #2A5D8F */
   }
 
   .dark {
@@ -98,9 +103,75 @@
     @apply border-border;
   }
 
+  html {
+    /* Previene el cambio de ancho cuando aparece el scroll */
+    scrollbar-gutter: stable;
+    /* Alternativa para navegadores que no soportan scrollbar-gutter */
+    overflow-y: scroll;
+    /* Asegurar que no haya scroll horizontal */
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
-    background: linear-gradient(135deg, hsl(var(--siclo-light)) 0%, hsl(var(--background)) 100%);
+    /* Asegura que el body no cause cambios de ancho */
+    overflow-x: hidden;
+    /* Prevenir cambios de layout cuando se abren modales/dropdowns */
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  /* Contenedor principal para evitar alteraciones de layout */
+  #root {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+
+  /* Prevenir overflow en todos los elementos radix */
+  [data-radix-popper-content-wrapper] {
+    max-width: min(calc(100vw - 2rem), 500px) !important;
+    z-index: 9999 !important;
+  }
+
+  /* Asegurar que los Select no causen overflow */
+  [data-radix-select-content] {
+    max-width: min(calc(100vw - 2rem), 500px) !important;
+    box-sizing: border-box !important;
+    position: fixed !important;
+    z-index: 9999 !important;
+  }
+
+  /* Prevenir que el viewport del select cause problemas */
+  [data-radix-select-viewport] {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Scrollbar personalizado - muy delgado */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Para Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 }
 
@@ -113,7 +184,18 @@
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
   }
   
-  .siclo-button {
-    @apply bg-gradient-to-r from-siclo-green to-siclo-blue text-white shadow-lg hover:shadow-xl transition-all duration-300;
+ 
+
+  /* Estilos para elementos del selector que previenen overflow */
+  .select-item-content {
+    @apply flex flex-col w-full min-w-0;
+  }
+
+  .select-item-title {
+    @apply font-medium truncate text-left;
+  }
+
+  .select-item-subtitle {
+    @apply text-xs text-muted-foreground truncate text-left;
   }
 }

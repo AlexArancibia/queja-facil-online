@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import apiClient from '@/lib/api';
 import { 
@@ -22,67 +21,13 @@ interface RatingsState {
   
   // Actions
   fetchRatings: (params?: { page?: number; limit?: number; branchId?: string; instructorId?: string }) => Promise<void>;
-  createRating: (rating: CreateRatingDto) => Promise<string>;
-  updateRating: (id: string, updates: UpdateRatingDto) => Promise<void>;
+  createRating: (rating: CreateRatingDto) => Promise<Rating>;
+  updateRating: (id: string, updates: UpdateRatingDto) => Promise<Rating>;
   deleteRating: (id: string) => Promise<void>;
-  searchRatings: (filters: { branchId?: string; instructorId?: string; dateRange?: { from: Date; to: Date } }) => Promise<Rating[]>;
   getRatingStats: (branchId?: string, instructorId?: string) => Promise<RatingStats>;
+  getRatingAnalytics: (branchId?: string) => Promise<any>;
   getRatingById: (id: string) => Promise<Rating>;
 }
-
-// API functions
-const api = {
-  async getRatings(params?: { page?: number; limit?: number; branchId?: string; instructorId?: string }): Promise<PaginatedResponse<Rating>> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.branchId) searchParams.append('branchId', params.branchId);
-    if (params?.instructorId) searchParams.append('instructorId', params.instructorId);
-    
-    const response = await apiClient.get(`/ratings?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async createRating(rating: CreateRatingDto): Promise<{ id: string }> {
-    const response = await apiClient.post('/ratings', rating);
-    return response.data;
-  },
-
-  async updateRating(id: string, updates: UpdateRatingDto): Promise<void> {
-    await apiClient.patch(`/ratings/${id}`, updates);
-  },
-
-  async deleteRating(id: string): Promise<void> {
-    await apiClient.delete(`/ratings/${id}`);
-  },
-
-  async searchRatings(filters: { branchId?: string; instructorId?: string; dateRange?: { from: Date; to: Date } }): Promise<Rating[]> {
-    const searchParams = new URLSearchParams();
-    if (filters.branchId) searchParams.append('branchId', filters.branchId);
-    if (filters.instructorId) searchParams.append('instructorId', filters.instructorId);
-    if (filters.dateRange) {
-      searchParams.append('from', filters.dateRange.from.toISOString());
-      searchParams.append('to', filters.dateRange.to.toISOString());
-    }
-    
-    const response = await apiClient.get(`/ratings?${searchParams.toString()}`);
-    return response.data.data || [];
-  },
-
-  async getRatingStats(branchId?: string, instructorId?: string): Promise<RatingStats> {
-    const searchParams = new URLSearchParams();
-    if (branchId) searchParams.append('branchId', branchId);
-    if (instructorId) searchParams.append('instructorId', instructorId);
-    
-    const response = await apiClient.get(`/ratings/stats?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async getRatingById(id: string): Promise<Rating> {
-    const response = await apiClient.get(`/ratings/${id}`);
-    return response.data;
-  }
-};
 
 export const useRatingsStore = create<RatingsState>((set, get) => ({
   ratings: [],
@@ -98,14 +43,21 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
   fetchRatings: async (params) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.getRatings(params);
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.append('page', params.page.toString());
+      if (params?.limit) searchParams.append('limit', params.limit.toString());
+      if (params?.branchId) searchParams.append('branchId', params.branchId);
+      if (params?.instructorId) searchParams.append('instructorId', params.instructorId);
+      
+      const response = await apiClient.get<PaginatedResponse<Rating>>(`/ratings?${searchParams.toString()}`);
+      
       set({ 
-        ratings: response.data,
+        ratings: response.data.data,
         pagination: {
-          page: response.page,
-          limit: response.limit,
-          total: response.total,
-          totalPages: response.totalPages
+          page: response.data.page,
+          limit: response.data.limit,
+          total: response.data.total,
+          totalPages: response.data.totalPages
         },
         loading: false 
       });
@@ -117,11 +69,18 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
   createRating: async (rating) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.createRating(rating);
+      console.log('⭐ PAYLOAD CALIFICACIÓN RECIBIDO:', JSON.stringify(rating, null, 2));
+      console.log('📤 Enviando calificación...');
+      
+      const response = await apiClient.post<Rating>('/ratings', rating);
+      console.log('✅ Calificación creada exitosamente:', response.data);
+      
       await get().fetchRatings();
       set({ loading: false });
-      return response.id;
+      return response.data;
     } catch (error: any) {
+      console.error('❌ Error creando calificación:', error);
+      console.error('❌ Error response:', error.response?.data);
       set({ error: error.response?.data?.message || 'Error al crear la calificación', loading: false });
       throw error;
     }
@@ -130,9 +89,10 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
   updateRating: async (id, updates) => {
     set({ loading: true, error: null });
     try {
-      await api.updateRating(id, updates);
+      const response = await apiClient.patch<Rating>(`/ratings/${id}`, updates);
       await get().fetchRatings();
       set({ loading: false });
+      return response.data;
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Error al actualizar la calificación', loading: false });
       throw error;
@@ -142,7 +102,7 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
   deleteRating: async (id) => {
     set({ loading: true, error: null });
     try {
-      await api.deleteRating(id);
+      await apiClient.delete(`/ratings/${id}`);
       await get().fetchRatings();
       set({ loading: false });
     } catch (error: any) {
@@ -151,21 +111,26 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
     }
   },
 
-  searchRatings: async (filters) => {
-    set({ loading: true, error: null });
+  getRatingStats: async (branchId, instructorId) => {
     try {
-      const results = await api.searchRatings(filters);
-      set({ loading: false });
-      return results;
+      const searchParams = new URLSearchParams();
+      if (branchId) searchParams.append('branchId', branchId);
+      if (instructorId) searchParams.append('instructorId', instructorId);
+      
+      const response = await apiClient.get<RatingStats>(`/ratings/stats?${searchParams.toString()}`);
+      return response.data;
     } catch (error: any) {
-      set({ error: error.response?.data?.message || 'Error al buscar calificaciones', loading: false });
       throw error;
     }
   },
 
-  getRatingStats: async (branchId, instructorId) => {
+  getRatingAnalytics: async (branchId) => {
     try {
-      return await api.getRatingStats(branchId, instructorId);
+      const searchParams = new URLSearchParams();
+      if (branchId) searchParams.append('branchId', branchId);
+      
+      const response = await apiClient.get<any>(`/ratings/analytics?${searchParams.toString()}`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }
@@ -173,7 +138,8 @@ export const useRatingsStore = create<RatingsState>((set, get) => ({
 
   getRatingById: async (id) => {
     try {
-      return await api.getRatingById(id);
+      const response = await apiClient.get<Rating>(`/ratings/${id}`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }

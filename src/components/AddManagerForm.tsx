@@ -1,20 +1,25 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_STORES } from '@/types/complaint';
+import { useBranchesStore } from '@/stores/branchesStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, Mail, User, Store, Key } from 'lucide-react';
+import { UserPlus, Mail, User, Store, Key, Loader2, Phone } from 'lucide-react';
+import { UserRole, type RegisterDto } from '@/types/api';
 
 interface ManagerFormData {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
-  stores: string[];
+  phone: string;
+  company: string;
+  branchId: string;
 }
 
 interface AddManagerFormProps {
@@ -22,87 +27,80 @@ interface AddManagerFormProps {
 }
 
 const AddManagerForm = ({ onManagerAdded }: AddManagerFormProps) => {
-  const [selectedStores, setSelectedStores] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // Stores
+  const { branches, loading: branchesLoading, fetchBranches } = useBranchesStore();
+  const { register: registerUser } = useAuthStore();
 
   const {
     register,
     handleSubmit,
+    setValue,
     reset,
     formState: { errors }
   } = useForm<ManagerFormData>();
 
-  const handleStoreToggle = (storeId: string) => {
-    setSelectedStores(prev => 
-      prev.includes(storeId) 
-        ? prev.filter(id => id !== storeId)
-        : [...prev, storeId]
-    );
-  };
+  useEffect(() => {
+    if (!branches.length && !branchesLoading) {
+      fetchBranches(true); // Solo sucursales activas
+    }
+  }, [fetchBranches, branches, branchesLoading]);
 
   const onSubmit = async (data: ManagerFormData) => {
-    if (selectedStores.length === 0) {
-      toast({
-        title: "Error",
-        description: "Debes seleccionar al menos un local",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsSubmitting(true);
     
     try {
-      // Get existing managers
-      const existingManagers = JSON.parse(localStorage.getItem('managers') || '[]');
-      
-      // Check if email already exists
-      if (existingManagers.some((m: any) => m.email === data.email)) {
-        toast({
-          title: "Error",
-          description: "Ya existe un manager con este correo electrónico",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Create new manager
-      const newManager = {
-        id: `manager-${Date.now()}`,
-        name: data.name,
+      const managerData: RegisterDto = {
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.email,
-        password: data.password, // In real app, this would be hashed
-        role: 'manager',
-        stores: selectedStores,
-        createdAt: new Date()
+        password: data.password,
+        phone: data.phone,
+        company: data.company,
+        role: UserRole.MANAGER,
+        branchId: data.branchId
       };
 
-      // Save to localStorage
-      existingManagers.push(newManager);
-      localStorage.setItem('managers', JSON.stringify(existingManagers));
+      console.log('📝 Creando manager:', managerData);
+
+      await registerUser(managerData);
 
       // Reset form
       reset();
-      setSelectedStores([]);
 
       toast({
         title: "Manager agregado exitosamente",
-        description: `${data.name} ha sido agregado al sistema`,
+        description: `${data.firstName} ${data.lastName} ha sido agregado al sistema`,
       });
 
       onManagerAdded();
 
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error al crear manager:', error);
       toast({
         title: "Error al agregar manager",
-        description: "Por favor intenta nuevamente",
+        description: error.message || "Por favor intenta nuevamente",
         variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (branchesLoading) {
+    return (
+      <Card className="siclo-card">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-siclo-green" />
+            <span className="ml-2 text-siclo-dark">Cargando sucursales...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="siclo-card">
@@ -116,21 +114,39 @@ const AddManagerForm = ({ onManagerAdded }: AddManagerFormProps) => {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-siclo-dark font-medium flex items-center">
+              <Label htmlFor="firstName" className="text-siclo-dark font-medium flex items-center">
                 <User className="h-4 w-4 mr-2" />
-                Nombre Completo *
+                Nombre *
               </Label>
               <Input
-                id="name"
-                {...register('name', { required: 'El nombre es requerido' })}
+                id="firstName"
+                {...register('firstName', { required: 'El nombre es requerido' })}
                 placeholder="Nombre del manager"
                 className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
               />
-              {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
+              {errors.firstName && (
+                <p className="text-sm text-red-600">{errors.firstName.message}</p>
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className="text-siclo-dark font-medium flex items-center">
+                <User className="h-4 w-4 mr-2" />
+                Apellido *
+              </Label>
+              <Input
+                id="lastName"
+                {...register('lastName', { required: 'El apellido es requerido' })}
+                placeholder="Apellido del manager"
+                className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+              />
+              {errors.lastName && (
+                <p className="text-sm text-red-600">{errors.lastName.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-siclo-dark font-medium flex items-center">
                 <Mail className="h-4 w-4 mr-2" />
@@ -153,6 +169,35 @@ const AddManagerForm = ({ onManagerAdded }: AddManagerFormProps) => {
                 <p className="text-sm text-red-600">{errors.email.message}</p>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-siclo-dark font-medium flex items-center">
+                <Phone className="h-4 w-4 mr-2" />
+                Teléfono *
+              </Label>
+              <Input
+                id="phone"
+                {...register('phone', { required: 'El teléfono es requerido' })}
+                placeholder="+51 55 1234 5678"
+                className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+              />
+              {errors.phone && (
+                <p className="text-sm text-red-600">{errors.phone.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="company" className="text-siclo-dark font-medium flex items-center">
+              <Store className="h-4 w-4 mr-2" />
+              Empresa
+            </Label>
+            <Input
+              id="company"
+              {...register('company')}
+              placeholder="Nombre de la empresa (opcional)"
+              className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+            />
           </div>
 
           <div className="space-y-2">
@@ -178,57 +223,41 @@ const AddManagerForm = ({ onManagerAdded }: AddManagerFormProps) => {
             )}
           </div>
 
-          <div className="space-y-3">
-            <Label className="text-siclo-dark font-medium flex items-center">
+          <div className="space-y-2">
+            <Label htmlFor="branchId" className="text-siclo-dark font-medium flex items-center">
               <Store className="h-4 w-4 mr-2" />
-              Locales Asignados *
+              Sucursal Asignada *
             </Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {MOCK_STORES.map((store) => (
-                <div 
-                  key={store.id}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedStores.includes(store.id)
-                      ? 'border-siclo-green bg-siclo-green/10'
-                      : 'border-siclo-light hover:border-siclo-green/50'
-                  }`}
-                  onClick={() => handleStoreToggle(store.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-siclo-dark">{store.name}</p>
-                      <p className="text-sm text-siclo-dark/60">{store.address}</p>
-                    </div>
-                    <div className={`w-4 h-4 rounded border-2 ${
-                      selectedStores.includes(store.id)
-                        ? 'bg-siclo-green border-siclo-green'
-                        : 'border-siclo-light'
-                    }`}>
-                      {selectedStores.includes(store.id) && (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {selectedStores.length === 0 && (
-              <p className="text-sm text-red-600">Debes seleccionar al menos un local</p>
+            <Select onValueChange={(value) => setValue('branchId', value)}>
+              <SelectTrigger className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20">
+                <SelectValue placeholder="Selecciona una sucursal" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.filter(b => b.isActive).map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.branchId && (
+              <p className="text-sm text-red-600">Debes seleccionar una sucursal</p>
             )}
           </div>
 
           <Button 
             type="submit" 
-            className="w-full siclo-button text-lg py-6" 
-            disabled={isSubmitting || selectedStores.length === 0}
+            className="w-full siclo-button" 
+            disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <>Agregando manager...</>
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Agregando Manager...
+              </>
             ) : (
               <>
-                <UserPlus className="w-5 h-5 mr-3" />
+                <UserPlus className="h-4 w-4 mr-2" />
                 Agregar Manager
               </>
             )}

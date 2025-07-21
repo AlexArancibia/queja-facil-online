@@ -1,23 +1,34 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
-import { Star, Calendar, Clock, User, Building2 } from 'lucide-react';
-import { MOCK_STORES } from '@/types/complaint';
-import { MOCK_INSTRUCTORS } from '@/types/instructor';
-import type { Rating } from '@/types/instructor';
+import { Star, Calendar as CalendarIcon, Clock, User, Building2, CheckCircle, Home, Mail } from 'lucide-react';
+import { useBranchesStore } from '@/stores/branchesStore';
+import { useInstructorsStore } from '@/stores/instructorsStore';
+import { useRatingsStore } from '@/stores/ratingsStore';
+import { useEmailStore } from '@/stores/emailStore';
+import { Discipline, type CreateRatingDto } from '@/types/api';
 import TimePicker from './TimePicker';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { generateRatingConfirmationEmail } from '@/lib/emailTemplates';
+import { emailConfig } from '@/lib/envConfig';
+import { getBranchEmailMetadataSync } from '@/lib/emailHelpers';
 
 const ratingSchema = z.object({
-  storeId: z.string().min(1, 'Selecciona un local'),
+  email: z.string().email('Correo electrónico inválido').min(1, 'El correo es requerido'),
+  branchId: z.string().min(1, 'Selecciona un local'),
   instructorId: z.string().min(1, 'Selecciona un instructor'),
   date: z.string().min(1, 'Ingresa la fecha de la clase'),
   schedule: z.string().min(1, 'Selecciona el horario'),
@@ -35,7 +46,7 @@ type RatingFormData = z.infer<typeof ratingSchema>;
 
 const RatingForm = () => {
   const { toast } = useToast();
-  const [selectedStore, setSelectedStore] = useState('');
+  const navigate = useNavigate();
   const [ratings, setRatings] = useState({
     npsScore: 0,
     instructorRating: 0,
@@ -45,26 +56,46 @@ const RatingForm = () => {
     amenitiesRating: 0,
     punctualityRating: 0
   });
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [submitted, setSubmitted] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<RatingFormData>({
+  // Stores
+  const { branches, fetchBranches, loading: branchesLoading } = useBranchesStore();
+  const { instructors, fetchInstructors } = useInstructorsStore();
+  const { createRating } = useRatingsStore();
+  const { sendEmail } = useEmailStore();
+
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<RatingFormData>({
     resolver: zodResolver(ratingSchema)
   });
 
-  const watchedStore = watch('storeId');
-  const availableInstructors = MOCK_INSTRUCTORS.filter(instructor => 
-    instructor.storeId === watchedStore && instructor.isActive
-  );
+  const watchedBranch = watch('branchId');
+  const watchedInstructor = watch('instructorId');
+
+  // Load branches when component mounts
+  useEffect(() => {
+    if (!branches.length && !branchesLoading) {
+      fetchBranches(true);
+    }
+  }, [fetchBranches, branches, branchesLoading]);
+
+  // Load instructors when branch changes
+  useEffect(() => {
+    if (watchedBranch) {
+      fetchInstructors({ branchId: watchedBranch, active: true });
+    }
+  }, [watchedBranch, fetchInstructors]);
 
   const onSubmit = async (data: RatingFormData) => {
     try {
-      const instructor = MOCK_INSTRUCTORS.find(i => i.id === data.instructorId);
+      const instructor = instructors.find(i => i.id === data.instructorId);
       
-      const newRating: Rating = {
-        id: `rating-${Date.now()}`,
+      const newRating: CreateRatingDto = {
+        email: data.email,
         instructorId: data.instructorId,
-        storeId: data.storeId,
-        discipline: instructor?.discipline || '',
+        branchId: data.branchId,
         instructorName: instructor?.name || '',
+        discipline: instructor?.discipline || Discipline.SICLO,
         date: data.date,
         schedule: data.schedule,
         npsScore: data.npsScore,
@@ -74,29 +105,69 @@ const RatingForm = () => {
         attentionQualityRating: data.attentionQualityRating,
         amenitiesRating: data.amenitiesRating,
         punctualityRating: data.punctualityRating,
-        comments: data.comments,
-        createdAt: new Date()
+        comments: data.comments
       };
 
-      // Save to localStorage
-      const existingRatings = JSON.parse(localStorage.getItem('ratings') || '[]');
-      existingRatings.push(newRating);
-      localStorage.setItem('ratings', JSON.stringify(existingRatings));
+      const createdRating = await createRating(newRating);
+      setSubmitted(true);
 
+      // Enviar email de confirmación
+      try {
+        const selectedBranchData = branches.find(b => b.id === data.branchId);
+        const branchName = selectedBranchData?.name || 'Local';
+        const instructorName = instructor?.name || 'Instructor';
+        
+        const emailHtml = generateRatingConfirmationEmail(createdRating, branchName, instructorName);
+        
+        // Obtener metadata del branch y managers
+        const metadata = getBranchEmailMetadataSync(data.branchId, 'rating', createdRating.id);
+        
+        await sendEmail({
+          to: data.email,
+          subject: `⭐ Calificación Registrada - Gracias por tu feedback`,
+          html: emailHtml,
+          from: {
+            name: emailConfig.fromName,
+            address: emailConfig.fromAddress
+          },
+          metadata
+        });
+
+        console.log('✅ Email de confirmación de rating enviado exitosamente');
+      } catch (emailError) {
+        console.error('❌ Error enviando email de confirmación:', emailError);
+        // No mostramos error al usuario ya que el rating se registró exitosamente
+      }
+
+      // Mostrar mensaje de éxito
       toast({
-        title: "¡Calificación enviada!",
-        description: `Gracias por tu evaluación. ID: ${newRating.id.slice(-8)}`,
+        title: "¡Calificación registrada exitosamente!",
+        description: "Gracias por tu feedback. Te hemos enviado un email de confirmación.",
       });
 
-      // Reset form
-      window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudo enviar la calificación. Inténtalo de nuevo.",
+        description: error.message || "No se pudo enviar la calificación. Inténtalo de nuevo.",
         variant: "destructive",
       });
     }
+  };
+
+  const getRatingColor = (value: number) => {
+    if (value <= 6) return 'red';
+    if (value <= 8) return 'amber';
+    return 'emerald';
+  };
+
+  const getButtonColor = (score: number, currentValue: number) => {
+    if (score <= currentValue) {
+      const color = getRatingColor(currentValue);
+      if (color === 'red') return 'bg-red-50 text-red-700 border-red-200';
+      if (color === 'amber') return 'bg-amber-50 text-amber-700 border-amber-200';
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    }
+    return 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-slate-200';
   };
 
   const RatingSlider = ({ 
@@ -104,166 +175,245 @@ const RatingForm = () => {
     value, 
     onChange,
     fieldName,
-    hasError
+    hasError,
+    isNPS = false
   }: { 
     label: string; 
     value: number; 
     onChange: (value: number) => void;
     fieldName: keyof typeof ratings;
     hasError?: boolean;
-  }) => (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <Label className={`text-sm font-medium ${hasError ? 'text-red-500' : 'text-gray-700'}`}>
-          {label}
-        </Label>
-        <div className="flex items-center space-x-2">
-          {value > 0 ? (
-            <div className="flex items-center text-amber-600">
+    isNPS?: boolean;
+  }) => {
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <Label className={`text-sm font-medium ${hasError ? 'text-red-600' : isNPS ? 'text-white' : 'text-slate-800'}`}>
+            {label}
+          </Label>
+          {value > 0 && (
+            <div className={`flex items-center ${isNPS ? 'text-white' : 'text-siclo-yellow'}`}>
               <Star className="h-3 w-3 mr-1 fill-current" />
               <span className="text-sm font-medium">{value}</span>
             </div>
-          ) : (
-            <span className="text-xs text-gray-400">Sin calificar</span>
           )}
         </div>
+        <div className="grid grid-cols-10 gap-1">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+            <button
+              key={score}
+              type="button"
+              onClick={() => {
+                onChange(score);
+                setValue(fieldName, score);
+                setRatings(prev => ({ ...prev, [fieldName]: score }));
+              }}
+              className={`h-8 rounded text-xs font-medium transition-all duration-200 border ${
+                getButtonColor(score, value)
+              } ${hasError && value === 0 ? 'border-red-300' : ''}`}
+            >
+              {score}
+            </button>
+          ))}
+        </div>
+        {hasError && (
+          <p className="text-xs sm:text-sm text-red-600 font-medium">Debes calificar al menos con 1 punto</p>
+        )}
       </div>
-      <div className="grid grid-cols-10 gap-1">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
-          <button
-            key={score}
-            type="button"
-            onClick={() => {
-              onChange(score);
-              setValue(fieldName, score);
-              setRatings(prev => ({ ...prev, [fieldName]: score }));
-            }}
-            className={`h-8 rounded text-xs font-medium transition-all duration-200 border ${
-              score <= value
-                ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm'
-                : hasError
-                ? 'bg-red-50 text-red-400 hover:bg-red-100 border-red-200'
-                : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border-gray-200'
-            }`}
-          >
-            {score}
-          </button>
-        ))}
-      </div>
-      {hasError && (
-        <p className="text-red-500 text-xs">Debes calificar al menos con 1 punto</p>
-      )}
-    </div>
-  );
+    );
+  };
+
+  if (submitted) {
+    return (
+      <Card className="border-emerald-200 bg-emerald-50/50 shadow-sm">
+        <CardContent className="pt-6">
+          <div className="text-center">
+            <div className="mx-auto mb-4 sm:mb-6 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
+              <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4">
+              ¡Gracias por tu evaluación!
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 leading-relaxed max-w-md mx-auto">
+              Tu opinión es muy valiosa para nosotros y nos ayuda a 
+              <span className="font-medium text-slate-700"> mejorar continuamente</span>.
+            </p>
+            <Button 
+              onClick={() => navigate('/')} 
+              variant="outline" 
+              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Volver al inicio
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Store and Instructor Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+      {/* Email Field */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-slate-800 flex items-center">
+          <Mail className="h-4 w-4 mr-2 text-siclo-green" />
+          Correo Electrónico *
+        </Label>
+        <Input
+          type="email"
+          {...register('email')}
+          placeholder="tu@email.com"
+          className="border-border focus:border-border focus:ring-siclo-green/20 text-sm"
+        />
+        {errors.email && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.email.message}</p>}
+      </div>
+
+      {/* Branch and Instructor Selection */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center text-gray-700">
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
             <Building2 className="h-4 w-4 mr-2 text-siclo-green" />
-            Local
+            Local *
           </Label>
-          <Select onValueChange={(value) => {
-            setValue('storeId', value);
-            setSelectedStore(value);
-            setValue('instructorId', '');
-          }}>
-            <SelectTrigger className="border-gray-200 focus:border-siclo-green">
+          <Select 
+            onValueChange={(value) => {
+              setValue('branchId', value);
+              setValue('instructorId', '');
+            }}
+            
+            value={watchedBranch}
+          >
+            <SelectTrigger className="border-border focus:border-border focus:ring-siclo-green/20 text-sm">
               <SelectValue placeholder="Selecciona el local" />
             </SelectTrigger>
             <SelectContent>
-              {MOCK_STORES.map((store) => (
-                <SelectItem key={store.id} value={store.id}>
-                  {store.name}
+              {branchesLoading ? (
+                <SelectItem value="loading" disabled>
+                  <span className="text-slate-500">Cargando locales...</span>
                 </SelectItem>
-              ))}
+              ) : (
+                branches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    <div className="select-item-content">
+                      <span className="select-item-title font-medium text-slate-800">{branch.name}</span>
+                      <span className="select-item-subtitle text-slate-600">{branch.address}</span>
+                    </div>
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
-          {errors.storeId && <p className="text-red-500 text-xs">{errors.storeId.message}</p>}
+          {errors.branchId && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.branchId.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center text-gray-700">
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
             <User className="h-4 w-4 mr-2 text-siclo-blue" />
-            Instructor
+            Instructor *
           </Label>
           <Select 
             onValueChange={(value) => setValue('instructorId', value)}
-            disabled={!selectedStore}
+            disabled={!watchedBranch}
+            value={watchedInstructor}
           >
-            <SelectTrigger className="border-gray-200 focus:border-siclo-green">
+            <SelectTrigger className="border-border focus:border-border focus:ring-siclo-green/20 text-sm">
               <SelectValue placeholder="Selecciona el instructor" />
             </SelectTrigger>
             <SelectContent>
-              {availableInstructors.map((instructor) => (
-                <SelectItem key={instructor.id} value={instructor.id}>
-                  {instructor.name} - {instructor.discipline.toUpperCase()}
+              {instructors.length > 0 ? (
+                instructors.map((instructor) => (
+                  <SelectItem key={instructor.id} value={instructor.id}>
+                    <span className="font-medium text-slate-800">
+                      {instructor.name} - {instructor.discipline.toUpperCase()}
+                    </span>
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="no-instructors" disabled>
+                  <span className="text-slate-500">
+                    {watchedBranch ? 'No hay instructores disponibles' : 'Selecciona un local primero'}
+                  </span>
                 </SelectItem>
-              ))}
+              )}
             </SelectContent>
           </Select>
-          {errors.instructorId && <p className="text-red-500 text-xs">{errors.instructorId.message}</p>}
+          {errors.instructorId && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.instructorId.message}</p>}
         </div>
       </div>
 
       {/* Date and Schedule */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center text-gray-700">
-            <Calendar className="h-4 w-4 mr-2 text-siclo-green" />
-            Fecha de la clase
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
+            <CalendarIcon className="h-4 w-4 mr-2 text-siclo-green" />
+            Fecha de la clase *
           </Label>
-          <Input
-            type="date"
-            {...register('date')}
-            className="border-gray-200 focus:border-siclo-green"
-          />
-          {errors.date && <p className="text-red-500 text-xs">{errors.date.message}</p>}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal  border-border  text-sm",
+                  !selectedDate && "text-slate-500"
+                )}
+              >
+               
+                {selectedDate ? format(selectedDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  if (date) {
+                    setValue('date', format(date, 'yyyy-MM-dd'));
+                  }
+                }}
+                disabled={(date) => date > new Date()}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          {errors.date && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.date.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center text-gray-700">
-            <Clock className="h-4 w-4 mr-2 text-siclo-blue" />
-            Horario de la clase
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
+            <Clock className="h-4 w-4 mr-2 text-siclo-green" />
+            Horario de la clase *
           </Label>
           <TimePicker
+          
             onValueChange={(value) => setValue('schedule', value)}
           />
-          {errors.schedule && <p className="text-red-500 text-xs">{errors.schedule.message}</p>}
+          {errors.schedule && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.schedule.message}</p>}
         </div>
       </div>
 
       {/* NPS Score */}
-      <Card className="bg-blue-50/50 border-blue-100">
-        <CardContent className="pt-4">
+      <Card className="bg-gradient-to-r from-siclo-green/80 to-siclo-green border-slate-200 shadow-sm">
+        <CardContent className="pt-4 sm:pt-6 p-4">
           <RatingSlider
-            label="1. ¿Recomendarías esta clase? (NPS 1-10)"
+            label="1. ¿Recomendarías esta clase?"
             value={ratings.npsScore}
             onChange={(value) => {}}
             fieldName="npsScore"
             hasError={!!errors.npsScore}
+            isNPS={true}
           />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <div className="text-center p-2 bg-emerald-100/50 rounded">
-              <span className="text-emerald-700">Promotores: 9-10</span>
-            </div>
-            <div className="text-center p-2 bg-amber-100/50 rounded">
-              <span className="text-amber-700">Pasivos: 7-8</span>
-            </div>
-            <div className="text-center p-2 bg-red-100/50 rounded">
-              <span className="text-red-700">Detractores: 1-6</span>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
       {/* Detailed Ratings */}
-      <Card className="bg-amber-50/30 border-amber-100">
-        <CardContent className="pt-4">
-          <h3 className="text-base font-semibold text-gray-800 mb-4">2. Evaluación detallada</h3>
-          <div className="space-y-4">
+      <Card className="bg-slate-50/50 border-slate-200 shadow-sm " >
+        <CardContent className="pt-4 sm:pt-6 p-4">
+          <h3 className="text-base sm:text-lg font-medium text-slate-900 mb-4 sm:mb-6">
+            2. Evaluación detallada
+          </h3>
+          <div className="space-y-4 sm:space-y-6">
             <RatingSlider
               label="Instructor"
               value={ratings.instructorRating}
@@ -317,21 +467,37 @@ const RatingForm = () => {
 
       {/* Comments */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-gray-700">Comentarios adicionales (opcional)</Label>
+        <Label className="text-sm font-medium text-slate-800">
+          Comentarios adicionales (opcional)
+        </Label>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Comparte cualquier comentario adicional sobre tu experiencia en la clase
+        </p>
         <Textarea
-          placeholder="Comparte cualquier comentario adicional sobre tu experiencia..."
+          placeholder="Escribe tus comentarios aquí..."
           {...register('comments')}
-          className="border-gray-200 focus:border-siclo-green min-h-[80px] text-sm"
+          className="border-border focus:border-border focus:ring-siclo-green/20 min-h-20 sm:min-h-24 text-sm resize-y"
+          rows={3}
         />
       </div>
 
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full siclo-button h-11 text-base font-medium"
-      >
-        {isSubmitting ? 'Enviando calificación...' : 'Enviar Calificación'}
-      </Button>
+      {/* Submit Button */}
+      <div className="pt-2 border-t border-slate-200">
+        <Button
+          type="submit"
+          disabled={isSubmitting || !watchedBranch || !watchedInstructor}
+          className="w-full siclo-button bg-gradient-to-r from-siclo-orange via-siclo-purple to-siclo-deep-blue text-base sm:text-lg py-4 sm:py-6 font-medium shadow-md hover:shadow-lg transition-shadow"
+        >
+          {isSubmitting ? (
+            <span className="text-white/90">Enviando calificación...</span>
+          ) : (
+            <>
+              <Star className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3" />
+              Enviar Calificación
+            </>
+          )}
+        </Button>
+      </div>
     </form>
   );
 };

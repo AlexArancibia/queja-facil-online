@@ -4,90 +4,40 @@ import {
   type Instructor,
   type CreateInstructorDto,
   type UpdateInstructorDto,
-  type PaginatedResponse,
-  type Discipline
+  type Rating
 } from '@/types/api';
 
 interface InstructorsState {
   instructors: Instructor[];
   loading: boolean;
   error: string | null;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
   
   // Actions
-  fetchInstructors: (params?: { page?: number; limit?: number; branchId?: string; active?: boolean }) => Promise<void>;
-  createInstructor: (instructor: CreateInstructorDto) => Promise<string>;
-  updateInstructor: (id: string, updates: UpdateInstructorDto) => Promise<void>;
+  fetchInstructors: (params?: { branchId?: string; active?: boolean }) => Promise<void>;
+  createInstructor: (instructor: CreateInstructorDto) => Promise<Instructor>;
+  updateInstructor: (id: string, updates: UpdateInstructorDto) => Promise<Instructor>;
   deleteInstructor: (id: string) => Promise<void>;
   getInstructorById: (id: string) => Promise<Instructor>;
-  getInstructorsByBranch: (branchId: string) => Promise<Instructor[]>;
+  getAllInstructors: () => Promise<Instructor[]>; // For dropdowns and selects
+  getInstructorRatings: (id: string) => Promise<Rating[]>;
 }
-
-// API functions
-const api = {
-  async getInstructors(params?: { page?: number; limit?: number; branchId?: string; active?: boolean }): Promise<PaginatedResponse<Instructor>> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.branchId) searchParams.append('branchId', params.branchId);
-    if (params?.active !== undefined) searchParams.append('active', params.active.toString());
-    
-    const response = await apiClient.get(`/instructors?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async createInstructor(instructor: CreateInstructorDto): Promise<{ id: string }> {
-    const response = await apiClient.post('/instructors', instructor);
-    return response.data;
-  },
-
-  async updateInstructor(id: string, updates: UpdateInstructorDto): Promise<void> {
-    await apiClient.patch(`/instructors/${id}`, updates);
-  },
-
-  async deleteInstructor(id: string): Promise<void> {
-    await apiClient.delete(`/instructors/${id}`);
-  },
-
-  async getInstructorById(id: string): Promise<Instructor> {
-    const response = await apiClient.get(`/instructors/${id}`);
-    return response.data;
-  },
-
-  async getInstructorsByBranch(branchId: string): Promise<Instructor[]> {
-    const response = await apiClient.get(`/instructors?branchId=${branchId}&active=true`);
-    return response.data.data || [];
-  }
-};
 
 export const useInstructorsStore = create<InstructorsState>((set, get) => ({
   instructors: [],
   loading: false,
   error: null,
-  pagination: {
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0
-  },
 
   fetchInstructors: async (params) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.getInstructors(params);
+      const searchParams = new URLSearchParams();
+      if (params?.branchId) searchParams.append('branchId', params.branchId);
+      if (params?.active !== undefined) searchParams.append('active', params.active.toString());
+      
+      const response = await apiClient.get<Instructor[]>(`/instructors?${searchParams.toString()}`);
+      
       set({ 
         instructors: response.data,
-        pagination: {
-          page: response.page,
-          limit: response.limit,
-          total: response.total,
-          totalPages: response.totalPages
-        },
         loading: false 
       });
     } catch (error: any) {
@@ -98,10 +48,10 @@ export const useInstructorsStore = create<InstructorsState>((set, get) => ({
   createInstructor: async (instructor) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.createInstructor(instructor);
+      const response = await apiClient.post<Instructor>('/instructors', instructor);
       await get().fetchInstructors();
       set({ loading: false });
-      return response.id;
+      return response.data;
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Error al crear el instructor', loading: false });
       throw error;
@@ -111,9 +61,10 @@ export const useInstructorsStore = create<InstructorsState>((set, get) => ({
   updateInstructor: async (id, updates) => {
     set({ loading: true, error: null });
     try {
-      await api.updateInstructor(id, updates);
+      const response = await apiClient.patch<Instructor>(`/instructors/${id}`, updates);
       await get().fetchInstructors();
       set({ loading: false });
+      return response.data;
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Error al actualizar el instructor', loading: false });
       throw error;
@@ -123,7 +74,7 @@ export const useInstructorsStore = create<InstructorsState>((set, get) => ({
   deleteInstructor: async (id) => {
     set({ loading: true, error: null });
     try {
-      await api.deleteInstructor(id);
+      await apiClient.delete(`/instructors/${id}`);
       await get().fetchInstructors();
       set({ loading: false });
     } catch (error: any) {
@@ -134,15 +85,26 @@ export const useInstructorsStore = create<InstructorsState>((set, get) => ({
 
   getInstructorById: async (id) => {
     try {
-      return await api.getInstructorById(id);
+      const response = await apiClient.get<Instructor>(`/instructors/${id}`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }
   },
 
-  getInstructorsByBranch: async (branchId) => {
+  getAllInstructors: async () => {
     try {
-      return await api.getInstructorsByBranch(branchId);
+      const response = await apiClient.get<Instructor[]>('/instructors?active=true');
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  getInstructorRatings: async (id) => {
+    try {
+      const response = await apiClient.get<Rating[]>(`/instructors/${id}/ratings`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }

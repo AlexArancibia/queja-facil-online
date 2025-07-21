@@ -3,89 +3,42 @@ import apiClient from '@/lib/api';
 import { 
   type Branch,
   type CreateBranchDto,
-  type UpdateBranchDto,
-  type PaginatedResponse
+  type UpdateBranchDto
 } from '@/types/api';
 
 interface BranchesState {
   branches: Branch[];
   loading: boolean;
   error: string | null;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
   
   // Actions
-  fetchBranches: (params?: { page?: number; limit?: number; active?: boolean }) => Promise<void>;
-  createBranch: (branch: CreateBranchDto) => Promise<string>;
-  updateBranch: (id: string, updates: UpdateBranchDto) => Promise<void>;
+  fetchBranches: (active?: boolean) => Promise<void>;
+  createBranch: (branch: CreateBranchDto) => Promise<Branch>;
+  updateBranch: (id: string, updates: UpdateBranchDto) => Promise<Branch>;
   deleteBranch: (id: string) => Promise<void>;
   getBranchById: (id: string) => Promise<Branch>;
   getAllBranches: () => Promise<Branch[]>; // For dropdowns and selects
+  getBranchUsers: (id: string) => Promise<any[]>;
+  getBranchInstructors: (id: string) => Promise<any[]>;
+  getBranchComplaints: (id: string, status?: string) => Promise<any[]>;
+  getBranchRatings: (id: string) => Promise<any[]>;
 }
-
-// API functions
-const api = {
-  async getBranches(params?: { page?: number; limit?: number; active?: boolean }): Promise<PaginatedResponse<Branch>> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.active !== undefined) searchParams.append('active', params.active.toString());
-    
-    const response = await apiClient.get(`/branches?${searchParams.toString()}`);
-    return response.data;
-  },
-
-  async createBranch(branch: CreateBranchDto): Promise<{ id: string }> {
-    const response = await apiClient.post('/branches', branch);
-    return response.data;
-  },
-
-  async updateBranch(id: string, updates: UpdateBranchDto): Promise<void> {
-    await apiClient.patch(`/branches/${id}`, updates);
-  },
-
-  async deleteBranch(id: string): Promise<void> {
-    await apiClient.delete(`/branches/${id}`);
-  },
-
-  async getBranchById(id: string): Promise<Branch> {
-    const response = await apiClient.get(`/branches/${id}`);
-    return response.data;
-  },
-
-  async getAllBranches(): Promise<Branch[]> {
-    const response = await apiClient.get('/branches?active=true');
-    return response.data.data || [];
-  }
-};
 
 export const useBranchesStore = create<BranchesState>((set, get) => ({
   branches: [],
   loading: false,
   error: null,
-  pagination: {
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0
-  },
 
-  fetchBranches: async (params) => {
+  fetchBranches: async (active) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.getBranches(params);
+      const searchParams = new URLSearchParams();
+      if (active !== undefined) searchParams.append('active', active.toString());
+      
+      const response = await apiClient.get<Branch[]>(`/branches?${searchParams.toString()}`);
+      
       set({ 
         branches: response.data,
-        pagination: {
-          page: response.page,
-          limit: response.limit,
-          total: response.total,
-          totalPages: response.totalPages
-        },
         loading: false 
       });
     } catch (error: any) {
@@ -96,10 +49,10 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
   createBranch: async (branch) => {
     set({ loading: true, error: null });
     try {
-      const response = await api.createBranch(branch);
+      const response = await apiClient.post<Branch>('/branches', branch);
       await get().fetchBranches();
       set({ loading: false });
-      return response.id;
+      return response.data;
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Error al crear la sucursal', loading: false });
       throw error;
@@ -109,9 +62,10 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
   updateBranch: async (id, updates) => {
     set({ loading: true, error: null });
     try {
-      await api.updateBranch(id, updates);
+      const response = await apiClient.patch<Branch>(`/branches/${id}`, updates);
       await get().fetchBranches();
       set({ loading: false });
+      return response.data;
     } catch (error: any) {
       set({ error: error.response?.data?.message || 'Error al actualizar la sucursal', loading: false });
       throw error;
@@ -121,7 +75,7 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
   deleteBranch: async (id) => {
     set({ loading: true, error: null });
     try {
-      await api.deleteBranch(id);
+      await apiClient.delete(`/branches/${id}`);
       await get().fetchBranches();
       set({ loading: false });
     } catch (error: any) {
@@ -132,7 +86,8 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
 
   getBranchById: async (id) => {
     try {
-      return await api.getBranchById(id);
+      const response = await apiClient.get<Branch>(`/branches/${id}`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }
@@ -140,7 +95,47 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
 
   getAllBranches: async () => {
     try {
-      return await api.getAllBranches();
+      const response = await apiClient.get<Branch[]>('/branches?active=true');
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  getBranchUsers: async (id) => {
+    try {
+      const response = await apiClient.get<any[]>(`/branches/${id}/users`);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  getBranchInstructors: async (id) => {
+    try {
+      const response = await apiClient.get<any[]>(`/branches/${id}/instructors`);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  getBranchComplaints: async (id, status) => {
+    try {
+      const searchParams = new URLSearchParams();
+      if (status) searchParams.append('status', status);
+      
+      const response = await apiClient.get<any[]>(`/branches/${id}/complaints?${searchParams.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  getBranchRatings: async (id) => {
+    try {
+      const response = await apiClient.get<any[]>(`/branches/${id}/ratings`);
+      return response.data;
     } catch (error: any) {
       throw error;
     }

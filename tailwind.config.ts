@@ -20,7 +20,7 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				sans: ['DM Sans', 'sans-serif'],
+				sans: ['Poppins', 'sans-serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -69,7 +69,11 @@ export default {
 				'siclo-green': 'hsl(var(--siclo-green))',
 				'siclo-blue': 'hsl(var(--siclo-blue))',
 				'siclo-light': 'hsl(var(--siclo-light))',
-				'siclo-dark': 'hsl(var(--siclo-dark))'
+				'siclo-dark': 'hsl(var(--siclo-dark))',
+        'siclo-yellow': 'hsl(var(--siclo-yellow))',
+        'siclo-orange': 'hsl(var(--siclo-orange))',
+        'siclo-purple': 'hsl(var(--siclo-purple))',
+        'siclo-deep-blue': 'hsl(var(--siclo-deep-blue))',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

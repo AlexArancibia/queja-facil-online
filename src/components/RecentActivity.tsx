@@ -2,14 +2,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquareText, Star, Calendar, Building2 } from 'lucide-react';
-import { MOCK_STORES } from '@/types/complaint';
+import { type Complaint, type Rating, type Branch, ComplaintStatus } from '@/types/api';
 
 interface RecentActivityProps {
-  complaints: any[];
-  ratings: any[];
+  complaints: Complaint[];
+  ratings: Rating[];
+  branches?: Branch[];
 }
 
-const RecentActivity = ({ complaints, ratings }: RecentActivityProps) => {
+const RecentActivity = ({ complaints, ratings, branches = [] }: RecentActivityProps) => {
   // Combine and sort activities by date
   const activities = [
     ...complaints.map(complaint => ({
@@ -24,9 +25,19 @@ const RecentActivity = ({ complaints, ratings }: RecentActivityProps) => {
     }))
   ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 10);
 
-  const getStoreName = (storeId: string) => {
-    const store = MOCK_STORES.find(s => s.id === storeId);
-    return store ? store.name : storeId;
+  const getBranchName = (branchId: string) => {
+    const branch = branches.find(b => b.id === branchId);
+    return branch ? branch.name : branchId;
+  };
+
+  const getStatusText = (status: ComplaintStatus) => {
+    switch (status) {
+      case ComplaintStatus.PENDING: return 'Pendiente';
+      case ComplaintStatus.IN_PROGRESS: return 'En proceso';
+      case ComplaintStatus.RESOLVED: return 'Resuelta';
+      case ComplaintStatus.REJECTED: return 'Rechazada';
+      default: return status;
+    }
   };
 
   return (
@@ -59,22 +70,49 @@ const RecentActivity = ({ complaints, ratings }: RecentActivityProps) => {
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-siclo-dark truncate">
                       {activity.type === 'complaint' ? (
-                        `Nueva queja: ${activity.subject}`
+                        `Queja de ${activity.fullName}`
                       ) : (
                         `Calificación para ${activity.instructorName}`
                       )}
                     </p>
-                    <Badge variant={activity.type === 'complaint' ? 'destructive' : 'default'}>
-                      {activity.type === 'complaint' ? 'Queja' : 'Calificación'}
-                    </Badge>
+                    <div className="flex gap-2">
+                      <Badge variant={activity.type === 'complaint' ? 'destructive' : 'default'}>
+                        {activity.type === 'complaint' ? 'Queja' : 'Calificación'}
+                      </Badge>
+                      {activity.type === 'complaint' && (
+                        <Badge variant="outline" className="text-xs">
+                          {getStatusText(activity.status)}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="flex items-center text-xs text-muted-foreground mt-1">
                     <Building2 className="h-3 w-3 mr-1" />
-                    <span className="mr-3">{getStoreName(activity.storeId)}</span>
+                    <span className="mr-3">{getBranchName(activity.branchId)}</span>
                     <Calendar className="h-3 w-3 mr-1" />
                     <span>{activity.date.toLocaleDateString()}</span>
                   </div>
+                  
+                  {activity.type === 'complaint' && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                      {activity.observationType}: {activity.detail}
+                    </p>
+                  )}
+                  
+                  {activity.type === 'rating' && (
+                    <div className="flex items-center text-xs text-muted-foreground mt-1">
+                      <Star className="h-3 w-3 mr-1" />
+                      <span>NPS: {activity.npsScore} • Promedio: {(
+                        (Number(activity.instructorRating) +
+                         Number(activity.cleanlinessRating) +
+                         Number(activity.audioRating) +
+                         Number(activity.attentionQualityRating) +
+                         Number(activity.amenitiesRating) +
+                         Number(activity.punctualityRating)) / 6
+                      ).toFixed(1)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +10,10 @@ import ManagerPanel from "./pages/ManagerPanel";
 import AdminPanel from "./pages/AdminPanel";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthContext";
+import Navbar from "./components/Navbar";
+import AuthInitializer from "./components/AuthInitializer";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { UserRole } from "./types/api";
 
 const queryClient = new QueryClient();
 
@@ -20,19 +22,32 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/complaints" element={<Index />} />
-            <Route path="/ratings" element={<Ratings />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/manager" element={<ManagerPanel />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthInitializer />
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          
+          {/* Rutas públicas para formularios */}
+          <Route path="/complaints" element={<Index />} />
+          <Route path="/ratings" element={<Ratings />} />
+          
+          {/* Rutas protegidas solo para paneles administrativos */}
+          <Route path="/manager" element={
+            <ProtectedRoute requiredRole={UserRole.MANAGER}>
+              <ManagerPanel />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute requiredRole={UserRole.ADMIN}>
+              <AdminPanel />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

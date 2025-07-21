@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,26 +6,47 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { OBSERVATION_TYPES, MOCK_STORES, type Complaint } from '@/types/complaint';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, Send, CheckCircle, X, FileImage } from 'lucide-react';
+import { Send, CheckCircle } from 'lucide-react';
+import { ComplaintPriority, type CreateComplaintDto } from '@/types/api';
+import { useComplaintsStore } from '@/stores/complaintsStore';
+import { useBranchesStore } from '@/stores/branchesStore';
+import { useEmailStore } from '@/stores/emailStore';
+import { ImageUploader } from '@/components/ImageUploader';
+import { generateComplaintConfirmationEmail } from '@/lib/emailTemplates';
+import { emailConfig } from '@/lib/envConfig';
+import { getBranchEmailMetadataSync } from '@/lib/emailHelpers';
 
 interface ComplaintFormData {
   fullName: string;
   email: string;
-  store: string;
+  branchId: string;
   observationType: string;
   detail: string;
-  priority: 'Alta' | 'Media' | 'Baja';
+  priority: ComplaintPriority;
 }
 
+const OBSERVATION_TYPES = [
+  'Instalaciones',
+  'Servicio',
+  'Instructor',
+  'Limpieza',
+  'Seguridad',
+  'Otro'
+];
+
 const ComplaintForm = () => {
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [complaintId, setComplaintId] = useState('');
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const { toast } = useToast();
+  
+  // Stores
+  const { createComplaint } = useComplaintsStore();
+  const { branches, fetchBranches, loading: branchesLoading } = useBranchesStore();
+  const { sendEmail } = useEmailStore();
 
   const {
     register,
@@ -37,71 +57,86 @@ const ComplaintForm = () => {
     formState: { errors }
   } = useForm<ComplaintFormData>();
 
-  const selectedStore = watch('store');
+  const selectedBranch = watch('branchId');
   const selectedObservationType = watch('observationType');
   const selectedPriority = watch('priority');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setFiles(prev => [...prev, ...newFiles]);
-      
-      // Generate previews
-      newFiles.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreviews(prev => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
+  useEffect(() => {
+    // Fetch active branches when component mounts
+    if (!branches.length && !branchesLoading) {
+      fetchBranches(true);
     }
-  };
+  }, [fetchBranches, branches, branchesLoading]);
 
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-    setPreviews(prev => prev.filter((_, i) => i !== index));
+  const handleImagesChange = (imageUrls: string[]) => {
+    setUploadedImageUrls(imageUrls);
   };
 
   const onSubmit = async (data: ComplaintFormData) => {
+    setHasAttemptedSubmit(true);
     setIsSubmitting(true);
     
     try {
-      // Generate unique ID
-      const newComplaintId = `SICLO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-      
-      // Mock complaint creation
-      const newComplaint: Complaint = {
-        id: newComplaintId,
-        ...data,
-        status: 'Pendiente',
-        attachments: files,
-        createdAt: new Date(),
-        updatedAt: new Date()
+      // Usar las URLs de las imágenes ya subidas
+      const attachments = uploadedImageUrls.map((url, index) => ({
+        filename: `image-${index + 1}.jpg`,
+        url: url
+      }));
+
+      const formData: CreateComplaintDto = {
+        fullName: data.fullName,
+        email: data.email,
+        branchId: data.branchId,
+        observationType: data.observationType,
+        detail: data.detail,
+        priority: data.priority,
+        attachments: attachments
       };
 
-      // Store in localStorage for demo
-      const existingComplaints = JSON.parse(localStorage.getItem('complaints') || '[]');
-      existingComplaints.push(newComplaint);
-      localStorage.setItem('complaints', JSON.stringify(existingComplaints));
+      console.log('📝 FormData preparado:', JSON.stringify(formData, null, 2));
 
-      console.log('Nueva queja registrada:', newComplaint);
-      console.log('Archivos adjuntos:', files);
-
-      // Simulate email sending
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      setComplaintId(newComplaintId);
+      const createdComplaint = await createComplaint(formData);
+      
+      setComplaintId(createdComplaint.id);
       setSubmitted(true);
+
+      // Enviar email de confirmación
+      try {
+        const selectedBranchData = branches.find(b => b.id === data.branchId);
+        const branchName = selectedBranchData?.name || 'Local';
+        
+        const emailHtml = generateComplaintConfirmationEmail(createdComplaint, branchName);
+        
+        // Obtener metadata del branch y managers
+        const metadata = getBranchEmailMetadataSync(data.branchId, 'complaint', createdComplaint.id);
+        
+        await sendEmail({
+          to: data.email,
+          subject: `✅ Queja Registrada - ID: ${createdComplaint.id}`,
+          html: emailHtml,
+          from: {
+            name: emailConfig.fromName,
+            address: emailConfig.fromAddress
+          },
+          metadata
+        });
+
+        console.log('✅ Email de confirmación enviado exitosamente');
+      } catch (emailError) {
+        console.error('❌ Error enviando email de confirmación:', emailError);
+        // No mostramos error al usuario ya que la queja se registró exitosamente
+      }
       
       toast({
         title: "¡Queja registrada exitosamente!",
-        description: `Tu ID de queja es: ${newComplaintId}`,
+        description: `Tu ID de queja es: ${createdComplaint.id}. Te hemos enviado un email de confirmación.`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Error en ComplaintForm:', error);
       toast({
         title: "Error al registrar la queja",
-        description: "Por favor intenta nuevamente",
+        description: error.message || "Por favor intenta nuevamente",
         variant: "destructive"
       });
     } finally {
@@ -111,34 +146,41 @@ const ComplaintForm = () => {
 
   const resetForm = () => {
     reset();
-    setFiles([]);
-    setPreviews([]);
+    setUploadedImageUrls([]);
     setSubmitted(false);
     setComplaintId('');
+    setHasAttemptedSubmit(false);
   };
 
   if (submitted) {
     return (
-      <Card className="siclo-card border-emerald-200">
-        <CardContent className="pt-6">
+      <Card className="siclo-card border-emerald-200 w-full max-w-full overflow-hidden shadow-sm">
+        <CardContent className="pt-6 px-4 sm:px-6">
           <div className="text-center">
-            <div className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center">
-              <CheckCircle className="h-10 w-10 text-white" />
+            <div className="mx-auto mb-4 sm:mb-6 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
+              <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-white" /> 
             </div>
-            <h3 className="text-2xl font-bold text-siclo-dark mb-3">
+            <h3 className="text-xl sm:text-2xl font-semibold text-slate-900 mb-3">
               ¡Queja Registrada Exitosamente!
             </h3>
-            <div className="bg-siclo-light rounded-lg p-4 mb-6">
-              <p className="text-siclo-dark font-medium mb-2">Tu ID de queja es:</p>
-              <p className="font-mono text-xl font-bold text-siclo-blue bg-white rounded-md py-2 px-4 inline-block">
-                {complaintId}
-              </p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 max-w-full overflow-hidden">
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide mb-2">Tu ID de queja es</p>
+              <div className="bg-white rounded-md py-2 px-2 sm:px-4 max-w-full overflow-hidden border border-emerald-200">
+                <p className="font-mono text-base sm:text-xl font-semibold text-emerald-800 break-all">
+                  {complaintId}
+                </p>
+              </div>
             </div>
-            <p className="text-siclo-dark/70 mb-6 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-600 mb-4 sm:mb-6 leading-relaxed px-2">
               Hemos enviado un correo de confirmación a tu email con todos los detalles.
-              El manager del local ha sido notificado y pronto recibirás una respuesta.
+              <br />
+              <span className="font-medium text-slate-700">El manager del local ha sido notificado</span> y pronto recibirás una respuesta.
             </p>
-            <Button onClick={resetForm} variant="outline" className="border-siclo-green text-siclo-green hover:bg-siclo-green hover:text-white">
+            <Button 
+              onClick={resetForm} 
+              variant="outline" 
+              className="w-full sm:w-auto border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium"
+            >
               Registrar Nueva Queja
             </Button>
           </div>
@@ -148,28 +190,37 @@ const ComplaintForm = () => {
   }
 
   return (
-    <Card className="siclo-card">
-      <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10 rounded-t-lg">
-        <CardTitle className="text-siclo-dark text-xl">Registrar Nueva Queja</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <Card className="siclo-card w-full max-w-full overflow-hidden border-slate-200 shadow-sm">
+      <CardContent className="pt-6 px-4 sm:px-6">
+        <div className="mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Registrar Nueva Queja</h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Describe detalladamente tu experiencia. Tu retroalimentación es importante para nosotros.
+          </p>
+        </div>
+        
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+          {/* Personal Information */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-siclo-dark font-medium">Nombre Completo *</Label>
+              <Label htmlFor="fullName" className="text-sm font-medium text-slate-800">
+                Nombre Completo *
+              </Label>
               <Input
                 id="fullName"
                 {...register('fullName', { required: 'El nombre es requerido' })}
                 placeholder="Tu nombre completo"
-                className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+                className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm"
               />
               {errors.fullName && (
-                <p className="text-sm text-red-600">{errors.fullName.message}</p>
+                <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.fullName.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-siclo-dark font-medium">Correo Electrónico *</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-slate-800">
+                Correo Electrónico *
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -181,143 +232,163 @@ const ComplaintForm = () => {
                   }
                 })}
                 placeholder="tu@email.com"
-                className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+                className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm"
               />
               {errors.email && (
-                <p className="text-sm text-red-600">{errors.email.message}</p>
+                <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.email.message}</p>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Location and Type */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
-              <Label className="text-siclo-dark font-medium">Local *</Label>
-              <Select onValueChange={(value) => setValue('store', value)}>
-                <SelectTrigger className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20">
+              <Label className="text-sm font-medium text-slate-800">Local *</Label>
+              <Select 
+                onValueChange={(value) => setValue('branchId', value)}
+                value={selectedBranch}
+              >
+                <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
                   <SelectValue placeholder="Selecciona un local" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_STORES.map((store) => (
-                    <SelectItem key={store.id} value={store.id}>
-                      {store.name} - {store.address}
+                  {branchesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <span className="text-slate-500">Cargando locales...</span>
                     </SelectItem>
-                  ))}
+                  ) : (
+                    branches.map((branch) => (
+                      <SelectItem 
+                        key={branch.id} 
+                        value={branch.id}
+                      >
+                        <div className="select-item-content">
+                          <span className="select-item-title font-medium text-slate-800">{branch.name}</span>
+                          <span className="select-item-subtitle text-slate-600">{branch.address}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
-              {!selectedStore && (
-                <p className="text-sm text-red-600">Debes seleccionar un local</p>
+              {hasAttemptedSubmit && !selectedBranch && (
+                <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar un local</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label className="text-siclo-dark font-medium">Tipo de Observación *</Label>
-              <Select onValueChange={(value) => setValue('observationType', value)}>
-                <SelectTrigger className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20">
+              <Label className="text-sm font-medium text-slate-800">Tipo de Observación *</Label>
+              <Select 
+                onValueChange={(value) => setValue('observationType', value)}
+                value={selectedObservationType}
+              >
+                <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
                   <SelectValue placeholder="Selecciona el tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   {OBSERVATION_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type}
+                      <span className="font-medium text-slate-800">{type}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {!selectedObservationType && (
-                <p className="text-sm text-red-600">Debes seleccionar un tipo</p>
+              {hasAttemptedSubmit && !selectedObservationType && (
+                <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar un tipo</p>
               )}
             </div>
           </div>
 
+          {/* Priority */}
           <div className="space-y-2">
-            <Label className="text-siclo-dark font-medium">Prioridad *</Label>
-            <Select onValueChange={(value) => setValue('priority', value as 'Alta' | 'Media' | 'Baja')}>
-              <SelectTrigger className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20">
+            <Label className="text-sm font-medium text-slate-800">Prioridad *</Label>
+            <Select 
+              onValueChange={(value) => setValue('priority', value as ComplaintPriority)}
+              value={selectedPriority}
+            >
+              <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
                 <SelectValue placeholder="Selecciona la prioridad" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Alta">🔴 Alta</SelectItem>
-                <SelectItem value="Media">🟡 Media</SelectItem>
-                <SelectItem value="Baja">🟢 Baja</SelectItem>
+                <SelectItem value={ComplaintPriority.HIGH}>
+                  <span className="font-medium text-red-700">🔴 Alta</span>
+                </SelectItem>
+                <SelectItem value={ComplaintPriority.MEDIUM}>
+                  <span className="font-medium text-orange-700">🟡 Media</span>
+                </SelectItem>
+                <SelectItem value={ComplaintPriority.LOW}>
+                  <span className="font-medium text-green-700">🟢 Baja</span>
+                </SelectItem>
               </SelectContent>
             </Select>
-            {!selectedPriority && (
-              <p className="text-sm text-red-600">Debes seleccionar una prioridad</p>
+            {hasAttemptedSubmit && !selectedPriority && (
+              <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar una prioridad</p>
             )}
           </div>
 
+          {/* Detail */}
           <div className="space-y-2">
-            <Label htmlFor="detail" className="text-siclo-dark font-medium">Detalle de la Queja *</Label>
+            <Label htmlFor="detail" className="text-sm font-medium text-slate-800">
+              Detalle de la Queja *
+            </Label>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+              Describe detalladamente el problema o sugerencia que quieres reportar
+            </p>
             <Textarea
               id="detail"
-              {...register('detail', { required: 'El detalle es requerido' })}
+              {...register('detail', { 
+                required: 'El detalle es requerido',
+                minLength: {
+                  value: 20,
+                  message: 'El detalle debe tener al menos 20 caracteres'
+                }
+              })}
               placeholder="Describe detalladamente tu queja o sugerencia..."
-              className="min-h-24 border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20"
+              className="min-h-20 sm:min-h-24 w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 resize-y text-sm"
+              rows={4}
             />
             {errors.detail && (
-              <p className="text-sm text-red-600">{errors.detail.message}</p>
+              <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.detail.message}</p>
             )}
           </div>
 
-          <div className="space-y-4">
-            <Label className="text-siclo-dark font-medium">Adjuntar Imágenes (Opcional)</Label>
-            <div className="border-2 border-dashed border-siclo-light rounded-lg p-6 text-center hover:border-siclo-green transition-colors">
-              <label className="cursor-pointer block">
-                <Upload className="w-8 h-8 mx-auto mb-3 text-siclo-green" />
-                <p className="text-siclo-dark font-medium mb-1">
-                  Haz clic para subir imágenes
-                </p>
-                <p className="text-sm text-siclo-dark/60">PNG, JPG, JPEG (MAX. 5MB cada uno)</p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+          {/* Image Upload */}
+          <div className="space-y-3 sm:space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-slate-800">
+                Adjuntar Imágenes (Opcional)
+              </Label>
+              <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                Puedes adjuntar hasta 5 imágenes para apoyar tu queja (máximo 3MB por imagen)
+              </p>
             </div>
-            
-            {previews.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {previews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    <img 
-                      src={preview} 
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg border border-siclo-light"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                    <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                      <FileImage className="w-3 h-3 inline mr-1" />
-                      {files[index]?.name.substring(0, 10)}...
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="w-full max-w-full overflow-hidden">
+              <ImageUploader
+                onImagesChange={handleImagesChange}
+                maxImages={5}
+                maxFileSize={3}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full siclo-button text-lg py-6" 
-            disabled={isSubmitting || !selectedStore || !selectedObservationType || !selectedPriority}
-          >
-            {isSubmitting ? (
-              <>Enviando queja...</>
-            ) : (
-              <>
-                <Send className="w-5 h-5 mr-3" />
-                Enviar Queja
-              </>
-            )}
-          </Button>
+          {/* Submit Button */}
+          <div className="pt-2 border-t border-slate-200">
+            <Button 
+              type="submit" 
+              className="w-full siclo-button bg-gradient-to-r from-siclo-orange via-siclo-purple to-siclo-deep-blue text-base sm:text-lg py-4 sm:py-6 font-medium shadow-md hover:shadow-lg transition-shadow" 
+              disabled={isSubmitting || !selectedBranch || !selectedObservationType || !selectedPriority || branchesLoading}
+            >
+              {isSubmitting ? (
+                <span className="text-white/90">Enviando queja...</span>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3" />
+                  Enviar Queja
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
