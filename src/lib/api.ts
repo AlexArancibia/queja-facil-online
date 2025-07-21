@@ -8,7 +8,7 @@ const AUTH_TOKEN_KEY = "siclo_quejas_sistema_auth_token_v1";
 
 // Create Axios instance with the backend URL
 const apiClient: AxiosInstance = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: "https://quejasapi.emetstudio.com",
   headers: {
     "Content-Type": "application/json",
   },
