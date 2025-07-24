@@ -70,14 +70,14 @@ const RecentActivity = ({ complaints, ratings, branches = [] }: RecentActivityPr
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-siclo-dark truncate">
                       {activity.type === 'complaint' ? (
-                        `Queja de ${activity.fullName}`
+                        `Sugerencia de ${activity.fullName}`
                       ) : (
                         `Calificación para ${activity.instructorName}`
                       )}
                     </p>
                     <div className="flex gap-2">
                       <Badge variant={activity.type === 'complaint' ? 'destructive' : 'default'}>
-                        {activity.type === 'complaint' ? 'Queja' : 'Calificación'}
+                        {activity.type === 'complaint' ? 'Sugerencia' : 'Calificación'}
                       </Badge>
                       {activity.type === 'complaint' && (
                         <Badge variant="outline" className="text-xs">

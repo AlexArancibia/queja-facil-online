@@ -94,7 +94,7 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
       console.log('📤 Enviando queja como JSON...');
       
       const response = await apiClient.post<Complaint>('/complaints', complaint);
-      console.log('✅ Queja creada exitosamente:', response.data);
+      console.log('✅ Sugerencia creada exitosamente:', response.data);
       
       await get().fetchComplaints({
         page: get().pagination.page,

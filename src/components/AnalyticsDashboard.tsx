@@ -148,7 +148,7 @@ const AnalyticsDashboard = () => {
       {/* Main KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Total Quejas"
+          title="Total Sugerencias"
           value={stats.total}
           subtitle="Desde el inicio"
           icon={BarChart3}
@@ -187,7 +187,7 @@ const AnalyticsDashboard = () => {
           <CardHeader className="bg-gradient-to-r from-siclo-green/10 to-siclo-blue/10">
             <CardTitle className="text-siclo-dark flex items-center">
               <CheckCircle className="h-5 w-5 mr-2" />
-              Estado de Quejas
+              Estado de Sugerencias
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
@@ -316,7 +316,7 @@ const AnalyticsDashboard = () => {
       {/* Type Analysis */}
       <Card className="siclo-card">
         <CardHeader className="bg-gradient-to-r from-siclo-blue/10 to-siclo-green/10">
-          <CardTitle className="text-siclo-dark">Análisis por Tipo de Queja</CardTitle>
+          <CardTitle className="text-siclo-dark">Análisis por Tipo de Sugerencia</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

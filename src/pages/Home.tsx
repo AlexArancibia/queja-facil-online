@@ -14,18 +14,18 @@ const Home = () => {
       <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-6 flex flex-col justify-center items-center">
         {/* Header Section */}
         <div className="text-center mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">
-            ¿Qué deseas hacer hoy?
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-3 sm:mb-4 flex items-center justify-center gap-2">
+            Sigamos Mejorando <img src="/carita.png" alt="Carita Feliz" className="w-12 h-12" />
           </h2>
-          <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed px-2">
+          {/* <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed px-2">
             Elige la opción que mejor se adapte a lo que necesitas. 
             <span className="font-medium text-slate-700"> Tu opinión nos ayuda a crecer</span> y mejorar cada día.
-          </p>
+          </p> */}
         </div>
 
         {/* Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 max-w-3xl mx-auto mb-6 sm:mb-8 w-full">
-          {/* Quejas Card */}
+          {/* Sugerencias Card */}
           <Card 
             className="group siclo-card border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
             onClick={() => navigate('/complaints')}
@@ -35,13 +35,13 @@ const Home = () => {
                 <MessageSquareText className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
               </div>
               <h3 className="text-lg sm:text-lg lg:text-xl font-medium text-slate-900 mb-2 sm:mb-3">
-                Quejas y Sugerencias
+                Sugerencias
               </h3>
               <p className="text-xs sm:text-sm lg:text-base text-slate-600 mb-4 sm:mb-6 leading-relaxed">
-              Registra tu queja o sugerencia para ayudarnos a mejorar la calidad de nuestros servicios y atención.
+              Registra tu sugerencia para ayudarnos a mejorar la calidad de nuestros servicios y atención.
               </p>
               <div className="flex items-center justify-center text-siclo-orange font-medium transition-colors">
-                <span className="text-sm sm:text-base">Registrar queja</span>
+                <span className="text-sm sm:text-base">Registrar Observación</span>
                 <MessageSquareText className="h-3 w-3 sm:h-4 sm:w-4 ml-2" />
               </div>
             </CardContent>
@@ -57,7 +57,7 @@ const Home = () => {
                 <Star className="h-5 w-5 md:h-7 md:w-7 lg:h-8 lg:w-8 text-white" />
               </div>
               <h3 className="text-base md:text-lg lg:text-xl font-medium text-slate-900 mb-2 md:mb-3">
-                Calificar Instructor
+                Calificar Clase
               </h3>
               <p className="text-xs md:text-sm lg:text-base text-slate-600 mb-3 md:mb-6 leading-relaxed">
               Evalúa a tu instructor y comparte tu experiencia para mejorar la atención de otros usuarios.

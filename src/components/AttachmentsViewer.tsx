@@ -100,7 +100,7 @@ const AttachmentsViewer: React.FC<AttachmentsViewerProps> = ({
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}
                     >
-                      {attachment.type === 'complaint' ? 'Queja' : 'Resolución'}
+                      {attachment.type === 'complaint' ? 'Sugerencia' : 'Resolución'}
                     </Badge>
                   </div>
                 </div>

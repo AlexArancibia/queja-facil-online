@@ -89,7 +89,7 @@ const TestComplaintWithImages = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Ejemplo: Queja con Imágenes Adjuntas</h1>
+      <h1 className="text-2xl font-bold mb-6">Ejemplo: Sugerencia con Imágenes Adjuntas</h1>
       
       <Card className="w-full">
         <CardHeader>

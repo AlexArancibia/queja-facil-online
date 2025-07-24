@@ -63,7 +63,7 @@ const DashboardStats = ({ complaints, ratings, branch }: DashboardStatsProps) =>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Total Quejas
+            Total Sugerencias
           </CardTitle>
           <MessageSquareText className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
@@ -111,7 +111,7 @@ const DashboardStats = ({ complaints, ratings, branch }: DashboardStatsProps) =>
           <div className="text-2xl font-bold">
             {averageRating > 0 ? averageRating.toFixed(1) : '--'}
             {averageRating > 0 && (
-              <span className="text-sm text-muted-foreground ml-1">/ 5</span>
+              <span className="text-sm text-muted-foreground ml-1">/ 10</span>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -119,7 +119,7 @@ const DashboardStats = ({ complaints, ratings, branch }: DashboardStatsProps) =>
           </p>
           {totalRatings > 0 && (
             <p className="text-xs text-green-500 mt-1">
-              {(averageRating / 5 * 100).toFixed(0)}% satisfacción
+              {(averageRating / 10 * 100).toFixed(0)}% satisfacción
             </p>
           )}
         </CardContent>

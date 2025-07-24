@@ -161,7 +161,7 @@ const ComplaintSearch = () => {
       <div className="space-y-3 sm:space-y-4">
         <div className="space-y-2">
           <Label htmlFor="search" className="text-base md:text-lg font-semibold text-slate-800">
-            Buscar Queja
+            Buscar Sugerencia
           </Label>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
             Ingresa el ID de tu queja o tu correo electrónico para ver el estado
@@ -211,7 +211,7 @@ const ComplaintSearch = () => {
               <div className="flex items-center gap-2 mb-4">
                 <FileText className="h-5 w-5 text-slate-700 shrink-0" />
                 <h3 className="text-base sm:text-lg font-semibold text-slate-800">
-                  {searchResults.length === 1 ? 'Queja encontrada' : `${searchResults.length} quejas encontradas`}
+                  {searchResults.length === 1 ? 'Sugerencia encontrada' : `${searchResults.length} quejas encontradas`}
                 </h3>
               </div>
               
@@ -288,7 +288,7 @@ const ComplaintSearch = () => {
                     
                     {/* Complaint Detail */}
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Detalle de la Queja</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Detalle de la Sugerencia</p>
                       <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg max-w-full overflow-hidden">
                         <p className="text-sm sm:text-base text-slate-700 break-words whitespace-pre-wrap leading-relaxed">
                           {complaint.detail}

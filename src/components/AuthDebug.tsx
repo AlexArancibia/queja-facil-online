@@ -82,7 +82,7 @@ const AuthDebug = () => {
 
       addResult('📤 Enviando payload:', testComplaint);
       const response = await apiClient.post('/complaints', testComplaint);
-      addResult('✅ Queja creada exitosamente', {
+      addResult('✅ Sugerencia creada exitosamente', {
         id: response.data.id,
         status: response.data.status
       });
@@ -177,7 +177,7 @@ const AuthDebug = () => {
     //         🧪 Probar Endpoints Públicos
     //       </Button>
     //       <Button onClick={testComplaintCreation} variant="outline" size="sm">
-    //         📝 Probar Crear Queja
+    //         📝 Probar Crear Sugerencia
     //       </Button>
     //       <Button onClick={testRatingCreation} variant="outline" size="sm">
     //         ⭐ Probar Crear Calificación

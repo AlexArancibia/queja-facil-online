@@ -3,7 +3,7 @@
 ## 🎯 **Objetivos Cumplidos**
 
 ### ✅ **Logo y Branding**
-- **Reemplazado**: "Sistema de Quejas" → Logo Siclo + "Siclo"
+- **Reemplazado**: "Sistema de Sugerencias" → Logo Siclo + "Siclo"
 - **Archivo**: `/public/logo.jpg` ahora se muestra en el navbar
 - **Estilo**: Logo con altura de 8 unidades y texto "Siclo" en color siclo-dark
 
@@ -11,7 +11,7 @@
 
 #### 🔓 **Usuarios No Registrados**
 - **Inicio**: Más prominente (text-foreground/80 font-medium)
-- **Registrar Queja**: Enlace directo a formulario de quejas
+- **Registrar Sugerencia**: Enlace directo a formulario de quejas
 - **Calificar**: Enlace directo a formulario de calificaciones
 - **Botón Login**: Estilo siclo-green para destacar
 
@@ -21,7 +21,7 @@
   - Admin → `/admin`
   - Manager → `/manager`
   - Usuario → `/`
-- **Quejas/Calificaciones**: Solo visible para Admin
+- **Sugerencias/Calificaciones**: Solo visible para Admin
 - **Perfil**: Dropdown con información del usuario
 
 ### ✅ **Dropdown Mejorado**
@@ -38,7 +38,7 @@
 ### **Logo y Branding**
 ```tsx
 // ANTES
-<span className="font-bold">Sistema de Quejas</span>
+<span className="font-bold">Sistema de Sugerencias</span>
 
 // DESPUÉS
 <img src="/logo.jpg" alt="Siclo Logo" className="h-8 w-auto" />
@@ -50,7 +50,7 @@
 // Usuarios no registrados
 {!isAuthenticated && (
   <>
-    <Link to="/complaints">Registrar Queja</Link>
+    <Link to="/complaints">Registrar Sugerencia</Link>
     <Link to="/ratings">Calificar</Link>
   </>
 )}
@@ -58,7 +58,7 @@
 // Solo Admin ve quejas/calificaciones
 {user?.role === UserRole.ADMIN && (
   <>
-    <Link to="/complaints">Quejas</Link>
+    <Link to="/complaints">Sugerencias</Link>
     <Link to="/ratings">Valoraciones</Link>
   </>
 )}
@@ -108,7 +108,7 @@ const getDashboardRoute = (role?: UserRole) => {
 
 ### **No Registrado**
 ```
-Inicio (prominente) → Registrar Queja → Calificar → Login
+Inicio (prominente) → Registrar Sugerencia → Calificar → Login
 ```
 
 ### **Manager**
@@ -118,7 +118,7 @@ Inicio (sutil) → Dashboard (manager) → Perfil
 
 ### **Admin**
 ```
-Inicio (sutil) → Dashboard (admin) → Quejas → Valoraciones → Perfil
+Inicio (sutil) → Dashboard (admin) → Sugerencias → Valoraciones → Perfil
 ```
 
 ## ✅ **Beneficios**

@@ -1,4 +1,4 @@
-# Sistema de Autenticación - Queja Fácil Online
+# Sistema de Autenticación - Sugerencia Fácil Online
 
 ## Características Implementadas
 

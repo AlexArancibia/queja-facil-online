@@ -120,6 +120,8 @@ export interface Rating {
   punctualityRating: number;
   npsScore: number;
   comments?: string;
+  fullName?: string;
+  email?: string;
   createdAt: Date;
   instructor?: Instructor;
   branch?: Branch;
@@ -151,6 +153,7 @@ export interface UpdateComplaintDto {
 }
 
 export interface CreateRatingDto {
+  fullName?: string;
   email?: string;
   instructorId: string;
   branchId: string;

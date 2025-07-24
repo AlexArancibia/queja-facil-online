@@ -112,7 +112,7 @@ const ComplaintForm = () => {
         
         await sendEmail({
           to: data.email,
-          subject: `✅ Queja Registrada - ID: ${createdComplaint.id}`,
+          subject: `✅ Sugerencia Registrada - ID: ${createdComplaint.id}`,
           html: emailHtml,
           from: {
             name: emailConfig.fromName,
@@ -128,7 +128,7 @@ const ComplaintForm = () => {
       }
       
       toast({
-        title: "¡Queja registrada exitosamente!",
+        title: "¡Sugerencia registrada exitosamente!",
         description: `Tu ID de queja es: ${createdComplaint.id}. Te hemos enviado un email de confirmación.`,
       });
 
@@ -161,7 +161,7 @@ const ComplaintForm = () => {
               <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-white" /> 
             </div>
             <h3 className="text-xl sm:text-2xl font-semibold text-slate-900 mb-3">
-              ¡Queja Registrada Exitosamente!
+              ¡Sugerencia Registrada Exitosamente!
             </h3>
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 max-w-full overflow-hidden">
               <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide mb-2">Tu ID de queja es</p>
@@ -181,7 +181,7 @@ const ComplaintForm = () => {
               variant="outline" 
               className="w-full sm:w-auto border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 font-medium"
             >
-              Registrar Nueva Queja
+              Registrar Nueva Sugerencia
             </Button>
           </div>
         </CardContent>
@@ -193,7 +193,7 @@ const ComplaintForm = () => {
     <Card className="siclo-card w-full max-w-full overflow-hidden border-slate-200 shadow-sm">
       <CardContent className="pt-6 px-4 sm:px-6">
         <div className="mb-6">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Registrar Nueva Queja</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Registrar Nueva Sugerencia</h2>
           <p className="text-sm text-slate-600 leading-relaxed">
             Describe detalladamente tu experiencia. Tu retroalimentación es importante para nosotros.
           </p>
@@ -264,7 +264,6 @@ const ComplaintForm = () => {
                       >
                         <div className="select-item-content">
                           <span className="select-item-title font-medium text-slate-800">{branch.name}</span>
-                          <span className="select-item-subtitle text-slate-600">{branch.address}</span>
                         </div>
                       </SelectItem>
                     ))
@@ -329,11 +328,9 @@ const ComplaintForm = () => {
           {/* Detail */}
           <div className="space-y-2">
             <Label htmlFor="detail" className="text-sm font-medium text-slate-800">
-              Detalle de la Queja *
+              Detalle de la Sugerencia *
             </Label>
-            <p className="text-xs text-slate-600 leading-relaxed mb-2">
-              Describe detalladamente el problema o sugerencia que quieres reportar
-            </p>
+  
             <Textarea
               id="detail"
               {...register('detail', { 
@@ -343,7 +340,7 @@ const ComplaintForm = () => {
                   message: 'El detalle debe tener al menos 20 caracteres'
                 }
               })}
-              placeholder="Describe detalladamente tu queja o sugerencia..."
+              placeholder="Describe detalladamente tu sugerencia..."
               className="min-h-20 sm:min-h-24 w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 resize-y text-sm"
               rows={4}
             />
@@ -359,7 +356,7 @@ const ComplaintForm = () => {
                 Adjuntar Imágenes (Opcional)
               </Label>
               <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                Puedes adjuntar hasta 5 imágenes para apoyar tu queja (máximo 3MB por imagen)
+                Puedes adjuntar hasta 5 imágenes para apoyar tu sugerencia (máximo 3MB por imagen)
               </p>
             </div>
             <div className="w-full max-w-full overflow-hidden">
@@ -384,7 +381,7 @@ const ComplaintForm = () => {
               ) : (
                 <>
                   <Send className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3" />
-                  Enviar Queja
+                  Enviar Sugerencia
                 </>
               )}
             </Button>

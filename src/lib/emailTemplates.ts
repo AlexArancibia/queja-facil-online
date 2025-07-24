@@ -10,7 +10,7 @@ export const generateComplaintConfirmationEmail = (
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmación de Queja - Siclo</title>
+    <title>Confirmación de Sugerencia - Siclo</title>
     <style>
         body {
             margin: 0;
@@ -157,7 +157,7 @@ export const generateComplaintConfirmationEmail = (
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎯 Queja Registrada</h1>
+            <h1>🎯 Sugerencia Registrada</h1>
             <p>Hemos recibido tu queja y estamos trabajando en ella</p>
         </div>
         
@@ -167,12 +167,12 @@ export const generateComplaintConfirmationEmail = (
             <p>Gracias por tomarte el tiempo de compartir tu experiencia con nosotros. Tu opinión es muy importante y nos ayuda a mejorar continuamente nuestros servicios.</p>
             
             <div class="complaint-id">
-                <h2>Tu ID de Queja es:</h2>
+                <h2>Tu ID de Sugerencia es:</h2>
                 <div class="id">${complaint.id}</div>
             </div>
             
             <div class="details">
-                <h3 style="margin-top: 0; color: #2A5D8F;">Detalles de tu Queja</h3>
+                <h3 style="margin-top: 0; color: #2A5D8F;">Detalles de tu Sugerencia</h3>
                 
                 <div class="detail-row">
                     <div class="detail-label">Local:</div>
@@ -601,7 +601,7 @@ export const generateComplaintStatusUpdateEmail = (
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Actualización de Queja - Siclo</title>
+    <title>Actualización de Sugerencia - Siclo</title>
     <style>
         body {
             margin: 0;
@@ -764,11 +764,11 @@ export const generateComplaintStatusUpdateEmail = (
                         ${newStatusInfo.emoji} ${newStatusInfo.text}
                     </div>
                 </div>
-                <p style="margin: 0; color: #6b7280; font-size: 14px;">ID de Queja: <code>${complaint.id}</code></p>
+                <p style="margin: 0; color: #6b7280; font-size: 14px;">ID de Sugerencia: <code>${complaint.id}</code></p>
             </div>
             
             <div class="details">
-                <h3 style="margin-top: 0; color: #2A5D8F;">Detalles de tu Queja</h3>
+                <h3 style="margin-top: 0; color: #2A5D8F;">Detalles de tu Sugerencia</h3>
                 
                 <div class="detail-row">
                     <div class="detail-label">Local:</div>

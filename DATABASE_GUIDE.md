@@ -125,7 +125,7 @@ model Instructor {
   ratings    Rating[]
 }
 
-// Modelo Complaint (Quejas)
+// Modelo Complaint (Sugerencias)
 model Complaint {
   id                     String            @id @default(dbgenerated("'SICLO-' || extract(epoch from now())::text || '-' || substr(gen_random_uuid()::text, 1, 8)"))
   fullName               String
@@ -256,7 +256,7 @@ const Component = () => {
         detail: 'Descripción de la queja',
         priority: ComplaintPriority.MEDIUM
       });
-      console.log('Queja creada con ID:', id);
+      console.log('Sugerencia creada con ID:', id);
     } catch (error) {
       console.error('Error creating complaint:', error);
     }
@@ -467,7 +467,7 @@ if (error) return <ErrorMessage message={error} />;
 
 ## Filtros y Búsquedas
 
-### Quejas con filtros:
+### Sugerencias con filtros:
 ```typescript
 await fetchComplaints({
   page: 1,
@@ -519,7 +519,7 @@ interface StoreState {
 - `GET /auth/profile` - Perfil del usuario
 - `POST /auth/verify-email` - Verificar email
 
-### Quejas
+### Sugerencias
 - `GET /complaints` - Listar quejas (con filtros)
 - `POST /complaints` - Crear queja (público)
 - `GET /complaints/:id` - Obtener queja específica

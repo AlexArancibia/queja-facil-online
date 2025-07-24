@@ -50,9 +50,10 @@ import {
   Phone,
   Mail,
   Target,
-  Users
+  Users,
+  TrendingUp,
+  PieChart
 } from 'lucide-react';
-import DashboardStats from '@/components/DashboardStats';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { generateComplaintStatusUpdateEmail } from '@/lib/emailTemplates';
 import { emailConfig } from '@/lib/envConfig';
@@ -66,6 +67,7 @@ import type {
   Attachment
 } from '@/types/api';
 import AttachmentsViewer from '@/components/AttachmentsViewer';
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
 type RatingActivity = Omit<Rating, 'date'> & { 
@@ -73,6 +75,7 @@ type RatingActivity = Omit<Rating, 'date'> & {
   activityDate: Date; 
   branchId: string; 
   fullName: string;
+  email?: string;
   date: string;
 };
 
@@ -120,6 +123,12 @@ const ManagerPanel = () => {
   const [resolutionFiles, setResolutionFiles] = useState<File[]>([]);
   const [resolutionPreviews, setResolutionPreviews] = useState<string[]>([]);
   const [isUpdatingComplaint, setIsUpdatingComplaint] = useState(false);
+  
+  // Estado para las estadísticas
+  const [statsView, setStatsView] = useState('ratings'); // 'ratings' o 'complaints'
+  const [complaintStats, setComplaintStats] = useState<any>(null);
+  const [ratingStats, setRatingStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Hook de subida de imágenes
   const {
@@ -166,6 +175,13 @@ const ManagerPanel = () => {
     }
   }, [searchParams]);
 
+  // Cargar estadísticas cuando se cambia a la pestaña de stats
+  useEffect(() => {
+    if (activeTab === 'stats' && managerBranchId) {
+      loadStats();
+    }
+  }, [activeTab, managerBranchId]);
+
   const loadInitialData = async () => {
     setIsInitialLoading(true);
     try {
@@ -204,6 +220,27 @@ const ManagerPanel = () => {
         description: "No se pudieron actualizar los datos",
         variant: "destructive"
       });
+    }
+  };
+
+  const loadStats = async () => {
+    setStatsLoading(true);
+    try {
+      const [complaintsData, ratingsData] = await Promise.all([
+        getComplaintStats(managerBranchId),
+        getRatingStats(managerBranchId)
+      ]);
+
+      setComplaintStats(complaintsData);
+      setRatingStats(ratingsData);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las estadísticas",
+        variant: "destructive"
+      });
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -315,7 +352,7 @@ const ManagerPanel = () => {
 
           await sendEmail({
             to: selectedComplaint.email,
-            subject: `📋 Actualización de Queja - ID: ${selectedComplaint.id}`,
+            subject: `📋 Actualización de Sugerencia - ID: ${selectedComplaint.id}`,
             html: emailHtml,
             from: {
               name: emailConfig.fromName,
@@ -389,7 +426,8 @@ const ManagerPanel = () => {
       type: 'rating' as const,
       activityDate: new Date(rating.createdAt),
       branchId: rating.branchId,
-      fullName: `Calificación de ${rating.instructorName}`,
+      fullName: rating.fullName || `Calificación de ${rating.instructorName}`,
+      email: rating.email,
       date: rating.date
     }))
   ];
@@ -445,10 +483,25 @@ const ManagerPanel = () => {
       type: 'rating' as const,
       activityDate: new Date(r.createdAt),
       branchId: r.branchId,
-      fullName: `Calificación de ${r.instructorName}`,
+      fullName: r.fullName || `Calificación de ${r.instructorName}`,
+      email: r.email,
       date: r.date,
     }))
     .sort((a, b) => b.activityDate.getTime() - a.activityDate.getTime());
+
+  // Data para gráficos de estadísticas
+  const statusData = complaintStats ? [
+    { name: 'Pendientes', value: complaintStats.byStatus?.pending || 0, color: '#f59e0b' },
+    { name: 'En Proceso', value: complaintStats.byStatus?.inProcess || 0, color: '#3b82f6' },
+    { name: 'Resueltas', value: complaintStats.byStatus?.resolved || 0, color: '#10b981' },
+    { name: 'Rechazadas', value: complaintStats.byStatus?.rejected || 0, color: '#ef4444' },
+  ].filter(item => item.value > 0) : [];
+
+  const priorityData = complaintStats ? [
+    { name: 'Alta', value: complaintStats.byPriority?.high || 0, color: '#ef4444' },
+    { name: 'Media', value: complaintStats.byPriority?.medium || 0, color: '#f59e0b' },
+    { name: 'Baja', value: complaintStats.byPriority?.low || 0, color: '#10b981' },
+  ].filter(item => item.value > 0) : [];
 
   return (
     <div className="min-h-screen pt-16 bg-siclo-light">
@@ -460,7 +513,7 @@ const ManagerPanel = () => {
               className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium"
             >
               <MessageSquareText className="h-4 w-4 mr-2" />
-              Quejas
+              Sugerencias
             </TabsTrigger>
             <TabsTrigger 
               value="ratings" 
@@ -827,19 +880,13 @@ const ManagerPanel = () => {
                                 {/* Header del item */}
                                 <div className="flex items-start justify-between">
                                   <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                    <div className={`flex-shrink-0 p-2 rounded-lg ${
-                                      item.type === 'complaint' ? 'bg-red-100' : 'bg-blue-100'
-                                    }`}>
-                                      {item.type === 'complaint' ? (
-                                        <MessageSquareText className="h-4 w-4 text-red-600" />
-                                      ) : (
-                                        <Star className="h-4 w-4 text-blue-600" />
-                                      )}
+                                    <div className="flex-shrink-0 p-2 rounded-lg bg-blue-100">
+                                      <Star className="h-4 w-4 text-blue-600" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center space-x-2 mb-1">
-                                        <Badge className={`${getStatusColor(item.status)} text-xs`}>
-                                          {getStatusText(item.status)}
+                                        <Badge className="bg-amber-100 text-amber-800 text-xs">
+                                          ⭐ {typeof item.npsScore === 'number' ? item.npsScore.toFixed(1) : item.npsScore}
                                         </Badge>
                                       </div>
                                     </div>
@@ -860,24 +907,30 @@ const ManagerPanel = () => {
                                 </div>
                                 {/* Información del item */}
                                 <div className="space-y-1 text-sm">
+                                  {item.fullName && item.fullName !== `Calificación de ${item.instructorName}` && (
+                                    <div className="flex items-center text-siclo-dark/70">
+                                      <User className="h-3 w-3 mr-2 flex-shrink-0 text-siclo-green" />
+                                      <span className="font-medium truncate">
+                                        {item.fullName}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {item.email && (
+                                    <div className="flex items-center text-siclo-dark/70">
+                                      <Mail className="h-3 w-3 mr-2 flex-shrink-0" />
+                                      <span className="text-xs truncate">{item.email}</span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center text-siclo-dark/70">
-                                    <User className="h-3 w-3 mr-2 flex-shrink-0 text-siclo-green" />
+                                    <User className="h-3 w-3 mr-2 flex-shrink-0 text-siclo-blue" />
                                     <span className="font-medium truncate">
-                                      {item.fullName}
+                                      Instructor: {item.instructorName}
                                     </span>
                                   </div>
-                                  {item.type === 'complaint' && (
-                                    <>
-                                      <div className="flex items-center text-siclo-dark/70">
-                                        <AlertTriangle className="h-3 w-3 mr-2 flex-shrink-0 text-amber-500" />
-                                        <span className="text-xs truncate">{item.observationType}</span>
-                                      </div>
-                                      <div className="flex items-center text-siclo-dark/70">
-                                        <Mail className="h-3 w-3 mr-2 flex-shrink-0" />
-                                        <span className="text-xs truncate">{item.email}</span>
-                                      </div>
-                                    </>
-                                  )}
+                                  <div className="flex items-center text-siclo-dark/70">
+                                    <AlertTriangle className="h-3 w-3 mr-2 flex-shrink-0 text-amber-500" />
+                                    <span className="text-xs truncate">{item.discipline}</span>
+                                  </div>
                                   <div className="flex items-center text-siclo-dark/70">
                                     <Calendar className="h-3 w-3 mr-2 flex-shrink-0 text-gray-400" />
                                     <span className="text-xs">
@@ -889,11 +942,11 @@ const ManagerPanel = () => {
                                     </span>
                                   </div>
                                 </div>
-                                {/* Detalle truncado */}
-                                {item.type === 'complaint' && (
+                                {/* Comentarios truncados */}
+                                {item.comments && (
                                   <div className="pt-2 border-t border-gray-100">
-                                    <p className="text-xs text-siclo-dark/60 line-clamp-2" title={item.detail}>
-                                      {item.detail}
+                                    <p className="text-xs text-siclo-dark/60 line-clamp-2" title={item.comments}>
+                                      {item.comments}
                                     </p>
                                   </div>
                                 )}
@@ -908,6 +961,7 @@ const ManagerPanel = () => {
                       <Table className="min-w-[900px]">
                         <TableHeader className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
                           <TableRow className="bg-gray-50/50">
+                            <TableHead className="font-semibold text-siclo-dark">Usuario</TableHead>
                             <TableHead className="font-semibold text-siclo-dark">Instructor</TableHead>
                             <TableHead className="font-semibold text-siclo-dark">Calificación</TableHead>
                             <TableHead className="font-semibold text-siclo-dark">Fecha</TableHead>
@@ -918,6 +972,19 @@ const ManagerPanel = () => {
                         <TableBody>
                           {filteredRatings.map((item) => (
                             <TableRow key={item.id} className="hover:bg-gray-50/50">
+                              {/* Usuario */}
+                              <TableCell>
+                                <div>
+                                  {item.fullName && item.fullName !== `Calificación de ${item.instructorName}` ? (
+                                    <>
+                                      <p className="font-medium text-siclo-dark text-sm">{item.fullName}</p>
+                                      {item.email && <p className="text-xs text-siclo-dark/60">{item.email}</p>}
+                                    </>
+                                  ) : (
+                                    <p className="text-xs text-siclo-dark/60 italic">Usuario anónimo</p>
+                                  )}
+                                </div>
+                              </TableCell>
                               {/* Instructor */}
                               <TableCell>
                                 <div>
@@ -932,7 +999,7 @@ const ManagerPanel = () => {
                                     ⭐ {typeof item.npsScore === 'number' ? item.npsScore.toFixed(1) : item.npsScore}
                                   </Badge>
                                   <div className="text-xs text-siclo-dark/60">
-                                    Instructor: {item.instructorRating}/5
+                                    Instructor: {item.instructorRating}/10
                                   </div>
                                 </div>
                               </TableCell>
@@ -996,27 +1063,173 @@ const ManagerPanel = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm p-4 rounded-lg border border-siclo-light/30 shadow-md">
               <div>
                 <h2 className="text-xl font-bold text-siclo-dark flex items-center">
-                  <Building2 className="h-5 w-5 mr-2" />
-                  Panel de Gestión - {managerBranch?.name || 'Sucursal'}
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Estadísticas - {managerBranch?.name || 'Sucursal'}
                 </h2>
                 <p className="text-sm text-siclo-dark/70 mt-1">
-                  Estadísticas de tu sucursal
+                  Analíticas detalladas de tu sucursal
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-siclo-green text-siclo-green">
-                  {user?.role === 'MANAGER' ? 'Manager' : 'Supervisor'}
-                </Badge>
+              <div className="bg-siclo-light-blue p-1 rounded-lg flex self-center sm:self-auto">
+                <Button
+                  onClick={() => setStatsView('ratings')}
+                  variant={statsView === 'ratings' ? 'siclo-blue' : 'ghost'}
+                  className="w-full sm:w-auto"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Calificaciones
+                </Button>
+                <Button
+                  onClick={() => setStatsView('complaints')}
+                  variant={statsView === 'complaints' ? 'siclo-orange' : 'ghost'}
+                  className="w-full sm:w-auto"
+                >
+                  <MessageSquareText className="h-4 w-4 mr-2" />
+                  Sugerencias
+                </Button>
               </div>
             </div>
-            <DashboardStats 
-              complaints={complaints} 
-              ratings={ratings} 
-              branch={managerBranch}
-            />
+
+            {statsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner size="lg" text="Cargando estadísticas..." />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Vista de Calificaciones */}
+                {statsView === 'ratings' && (
+                  <div className="space-y-6 animate-fade-in">
+                    {/* Estadísticas principales de Calificaciones */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <Card className="siclo-card hover:shadow-lg transition-all duration-200">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-siclo-dark/70">Total Calificaciones</CardTitle>
+                          <Star className="h-4 w-4 text-amber-500" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-siclo-dark">{ratingStats?.totalRatings || 0}</div>
+                          <p className="text-xs text-siclo-dark/60 mt-1">Evaluaciones completadas</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="siclo-card hover:shadow-lg transition-all duration-200">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-siclo-dark/70">Promedio General</CardTitle>
+                          <TrendingUp className="h-4 w-4 text-siclo-blue" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-siclo-dark">
+                            {ratingStats?.averages?.overall ? ratingStats.averages.overall.toFixed(1) : '--'}
+                            {ratingStats?.averages?.overall && <span className="text-sm text-siclo-dark/60 ml-1">/ 10</span>}
+                          </div>
+                          <p className="text-xs text-siclo-dark/60 mt-1">Satisfacción general</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="siclo-card hover:shadow-lg transition-all duration-200">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-siclo-dark/70">NPS</CardTitle>
+                          <Target className="h-4 w-4 text-purple-500" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-siclo-dark">{ratingStats?.averages?.nps ? ratingStats.averages.nps.toFixed(1) : '--'}</div>
+                          <p className="text-xs text-siclo-dark/60 mt-1">Net Promoter Score</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Desglose detallado de calificaciones */}
+                    {ratingStats?.averages && (
+                      <Card className="siclo-card">
+                        <CardHeader><CardTitle className="flex items-center text-siclo-dark"><BarChart3 className="h-5 w-5 mr-2" />Desglose de Calificaciones</CardTitle></CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg"><div className="text-2xl font-bold text-blue-600">{ratingStats.averages.instructor?.toFixed(1) || '--'}</div><div className="text-sm text-blue-700 font-medium">Instructor</div></div>
+                            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg"><div className="text-2xl font-bold text-green-600">{ratingStats.averages.cleanliness?.toFixed(1) || '--'}</div><div className="text-sm text-green-700 font-medium">Limpieza</div></div>
+                            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg"><div className="text-2xl font-bold text-purple-600">{ratingStats.averages.audio?.toFixed(1) || '--'}</div><div className="text-sm text-purple-700 font-medium">Audio</div></div>
+                            <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg"><div className="text-2xl font-bold text-yellow-600">{ratingStats.averages.attentionQuality?.toFixed(1) || '--'}</div><div className="text-sm text-yellow-700 font-medium">Atención</div></div>
+                            <div className="text-center p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg"><div className="text-2xl font-bold text-indigo-600">{ratingStats.averages.amenities?.toFixed(1) || '--'}</div><div className="text-sm text-indigo-700 font-medium">Comodidades</div></div>
+                            <div className="text-center p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-lg"><div className="text-2xl font-bold text-cyan-600">{ratingStats.averages.punctuality?.toFixed(1) || '--'}</div><div className="text-sm text-cyan-700 font-medium">Puntualidad</div></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Vista de Sugerencias */}
+                {statsView === 'complaints' && (
+                  <div className="space-y-6 animate-fade-in">
+                    {/* Estadísticas principales de Sugerencias */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <Card className="siclo-card hover:shadow-lg transition-all duration-200">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-siclo-dark/70">Total de Sugerencias</CardTitle>
+                          <MessageSquareText className="h-4 w-4 text-siclo-green" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-siclo-dark">{complaintStats?.total || 0}</div>
+                          <p className="text-xs text-siclo-dark/60 mt-1">Sugerencias registradas</p>
+                          {complaintStats?.resolutionRate !== undefined && (
+                            <div className="flex items-center mt-2">
+                              <Badge variant="outline" className={`text-xs ${complaintStats.resolutionRate >= 80 ? 'border-emerald-300 text-emerald-700' : complaintStats.resolutionRate >= 60 ? 'border-amber-300 text-amber-700' : 'border-red-300 text-red-700'}`}>
+                                {complaintStats.resolutionRate.toFixed(1)}% resueltas
+                              </Badge>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Gráficos de Sugerencias */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card className="siclo-card">
+                        <CardHeader><CardTitle className="flex items-center text-siclo-dark"><PieChart className="h-5 w-5 mr-2" />Estados de Sugerencias</CardTitle></CardHeader>
+                        <CardContent>
+                          {statusData.length > 0 ? (
+                            <div className="h-80">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RechartsPieChart>
+                                  <Pie data={statusData} cx="50%" cy="50%" labelLine={false} label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                                    {statusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                                  </Pie>
+                                  <Tooltip formatter={(value) => [value, 'Sugerencias']} />
+                                  <Legend iconType="circle" />
+                                </RechartsPieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div className="text-center text-siclo-dark/60 py-8"><PieChart className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de estado para mostrar</p></div>
+                          )}
+                        </CardContent>
+                      </Card>
+                      <Card className="siclo-card">
+                        <CardHeader><CardTitle className="flex items-center text-siclo-dark"><AlertTriangle className="h-5 w-5 mr-2" />Prioridad de Sugerencias</CardTitle></CardHeader>
+                        <CardContent>
+                          {priorityData.length > 0 ? (
+                            <div className="h-80">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={priorityData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                  <XAxis type="number" hide />
+                                  <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={80} />
+                                  <Tooltip cursor={{ fill: 'rgba(240, 240, 240, 0.5)' }} formatter={(value) => [value, 'Sugerencias']} />
+                                  <Bar dataKey="value" barSize={20} radius={[0, 4, 4, 0]}>
+                                    {priorityData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div className="text-center text-siclo-dark/60 py-8"><AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de prioridad para mostrar</p></div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
-        {/* Dialogs y lógica de detalle/edición permanecen igual, pero asegúrate de que funcionen con el tab activo */}
 
         {/* Dialog de detalle */}
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
@@ -1026,7 +1239,7 @@ const ManagerPanel = () => {
                 {selectedComplaint ? (
                   <>
                     <MessageSquareText className="h-5 w-5 text-red-600" />
-                    Detalle de Queja
+                    Detalle de Sugerencia
                   </>
                 ) : (
                   <>
@@ -1107,6 +1320,14 @@ const ManagerPanel = () => {
               </div>
             ) : selectedRating ? (
               <div className="space-y-4">
+                {selectedRating.fullName && selectedRating.fullName !== `Calificación de ${selectedRating.instructorName}` && (
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <Label className="text-sm font-medium text-gray-600">Usuario</Label>
+                    <p className="font-medium text-gray-900">{selectedRating.fullName}</p>
+                    {selectedRating.email && <p className="text-sm text-gray-600">{selectedRating.email}</p>}
+                  </div>
+                )}
+                
                 <div className="bg-gray-50 rounded-lg p-4">
                   <Label className="text-sm font-medium text-gray-600">Instructor</Label>
                   <p className="font-medium text-gray-900">{selectedRating.instructorName}</p>
@@ -1137,29 +1358,29 @@ const ManagerPanel = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Instructor</span>
-                      <span className="font-medium">{selectedRating.instructorRating}/5</span>
+                      <span className="font-medium">{selectedRating.instructorRating}/10</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Limpieza</span>
-                      <span className="font-medium">{selectedRating.cleanlinessRating}/5</span>
+                      <span className="font-medium">{selectedRating.cleanlinessRating}/10</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Audio</span>
-                      <span className="font-medium">{selectedRating.audioRating}/5</span>
+                      <span className="font-medium">{selectedRating.audioRating}/10</span>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Atención</span>
-                      <span className="font-medium">{selectedRating.attentionQualityRating}/5</span>
+                      <span className="font-medium">{selectedRating.attentionQualityRating}/10</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Comodidades</span>
-                      <span className="font-medium">{selectedRating.amenitiesRating}/5</span>
+                      <span className="font-medium">{selectedRating.amenitiesRating}/10</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Puntualidad</span>
-                      <span className="font-medium">{selectedRating.punctualityRating}/5</span>
+                      <span className="font-medium">{selectedRating.punctualityRating}/10</span>
                     </div>
                   </div>
                 </div>
@@ -1192,7 +1413,7 @@ const ManagerPanel = () => {
             {isUpdatingComplaint && (
               <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl transition-all">
                 <div className="flex flex-col items-center gap-4">
-                  <LoadingSpinner size="xl" />
+                  <LoadingSpinner size="lg" />
                   <span className="text-lg font-semibold text-siclo-green animate-pulse">Actualizando queja...</span>
                 </div>
               </div>
@@ -1202,7 +1423,7 @@ const ManagerPanel = () => {
               <div className="flex items-center gap-3 px-5 pt-5 pb-2 border-b border-gray-100">
  
                 <div>
-                  <DialogTitle className="text-lg font-bold text-siclo-dark mb-0">Actualizar Estado de Queja</DialogTitle>
+                  <DialogTitle className="text-lg font-bold text-siclo-dark mb-0">Actualizar Estado de Sugerencia</DialogTitle>
                   <DialogDescription className="text-sm text-gray-500 mt-0">
                     ID: <span className="font-mono text-gray-700">{selectedComplaint?.id}</span><br/>
                     {selectedComplaint && (

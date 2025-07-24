@@ -53,7 +53,7 @@ const EmailMetadataDebug = () => {
             onClick={() => generateMetadata('complaint')}
             disabled={!selectedBranchId}
           >
-            Test Queja
+            Test Sugerencia
           </Button>
           
           <Button 

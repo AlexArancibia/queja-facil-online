@@ -27,6 +27,8 @@ import { emailConfig } from '@/lib/envConfig';
 import { getBranchEmailMetadataSync } from '@/lib/emailHelpers';
 
 const ratingSchema = z.object({
+  fullName: z.string().min(2, 'Ingresa tu nombre completo').max(100, 'El nombre es muy largo'),
+  email: z.string().email('Ingresa un email válido'),
   branchId: z.string().min(1, 'Selecciona un local'),
   instructorId: z.string().min(1, 'Selecciona un instructor'),
   date: z.string().min(1, 'Ingresa la fecha de la clase'),
@@ -90,6 +92,8 @@ const RatingForm = () => {
       const instructor = instructors.find(i => i.id === data.instructorId);
       
       const newRating: CreateRatingDto = {
+        fullName: data.fullName,
+        email: data.email,
         instructorId: data.instructorId,
         branchId: data.branchId,
         instructorName: instructor?.name || '',
@@ -224,7 +228,35 @@ const RatingForm = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-      {/* Email Field eliminado */}
+      {/* User Information */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
+            <User className="h-4 w-4 mr-2 text-siclo-green" />
+            Nombre completo *
+          </Label>
+          <Input
+            placeholder="Tu nombre completo"
+            {...register('fullName')}
+            className="border-border focus:border-border focus:ring-siclo-green/20 text-sm"
+          />
+          {errors.fullName && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.fullName.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-slate-800 flex items-center">
+            <Mail className="h-4 w-4 mr-2 text-siclo-green" />
+            Email *
+          </Label>
+          <Input
+            type="email"
+            placeholder="tu@email.com"
+            {...register('email')}
+            className="border-border focus:border-border focus:ring-siclo-green/20 text-sm"
+          />
+          {errors.email && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.email.message}</p>}
+        </div>
+      </div>
 
       {/* Branch and Instructor Selection */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -254,7 +286,6 @@ const RatingForm = () => {
                   <SelectItem key={branch.id} value={branch.id}>
                     <div className="select-item-content">
                       <span className="select-item-title font-medium text-slate-800">{branch.name}</span>
-                      <span className="select-item-subtitle text-slate-600">{branch.address}</span>
                     </div>
                   </SelectItem>
                 ))
@@ -343,7 +374,7 @@ const RatingForm = () => {
             Horario de la clase *
           </Label>
           <TimePicker
-          
+            interval={15}
             onValueChange={(value) => setValue('schedule', value)}
           />
           {errors.schedule && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.schedule.message}</p>}

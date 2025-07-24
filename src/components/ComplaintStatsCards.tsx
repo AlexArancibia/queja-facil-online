@@ -59,12 +59,12 @@ export const ComplaintStatsCards = ({ branchId, startDate, endDate }: ComplaintS
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-      {/* Total Quejas */}
+      {/* Total Sugerencias */}
       <Card className="siclo-card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
         <CardContent className="pt-4 md:pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs md:text-sm font-medium text-red-700">Total Quejas</p>
+              <p className="text-xs md:text-sm font-medium text-red-700">Total Sugerencias</p>
               <p className="text-xl md:text-3xl font-bold text-red-900">{stats.total}</p>
             </div>
             <MessageSquareText className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
@@ -105,7 +105,7 @@ export const ComplaintStatsCards = ({ branchId, startDate, endDate }: ComplaintS
             <div>
               <p className="text-xs md:text-sm font-medium text-blue-700">Tasa de Resolución</p>
               <div className="flex items-center gap-1 md:gap-2">
-                <p className="text-lg md:text-3xl font-bold text-blue-900">{Math.round(stats.resolutionRate * 100)}%</p>
+                <p className="text-lg md:text-3xl font-bold text-blue-900">{Math.round(stats.resolutionRate )}%</p>
                 <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 hidden md:inline-flex">
                   {stats.byStatus.resolved}/{stats.total}
                 </Badge>

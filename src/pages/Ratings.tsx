@@ -17,10 +17,10 @@ const Ratings = () => {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8 sm:mb-8 ">
           <h2 className="text-4xl font-bold text-siclo-dark mb-4 mt-16 sm:mt-24">
-            Califica tu experiencia
+            Califica tu clase
           </h2>
           <p className="text-base sm:text-lg text-siclo-dark/70 max-w-2xl mx-auto leading-relaxed mt-4 sm:mt-8">
-            Tu opinión es valiosa. <span className="font-medium text-slate-700">Califica a tu instructor</span> y ayúdanos a brindar el mejor servicio.
+            Tu opinión es valiosa. <span className="font-medium text-slate-700">Califica tu clase</span> y ayúdanos a brindar el mejor servicio.
           </p>
         </div>
 

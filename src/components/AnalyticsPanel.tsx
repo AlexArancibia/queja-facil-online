@@ -49,6 +49,7 @@ const AnalyticsPanel = () => {
   const [filterInstructor, setFilterInstructor] = useState('all');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [activeView, setActiveView] = useState('ratings'); // 'ratings' or 'complaints'
   
   // Stats data
   const [complaintStats, setComplaintStats] = useState<any>(null);
@@ -96,7 +97,7 @@ const AnalyticsPanel = () => {
               ...branch,
               ratingsCount: ratings.length,
               avgRating: ratings.length > 0 
-                ? ratings.reduce((acc: number, r: any) => acc + (r.npsScore || 0), 0) / ratings.length 
+                ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.npsScore) || 0), 0) / ratings.length 
                 : 0
             };
           } catch (error) {
@@ -111,7 +112,7 @@ const AnalyticsPanel = () => {
               ...instructor,
               ratingsCount: ratings.length,
               avgRating: ratings.length > 0 
-                ? ratings.reduce((acc: number, r: any) => acc + (r.instructorRating || 0), 0) / ratings.length 
+                ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.instructor) || 0), 0) / ratings.length 
                 : 0
             };
           } catch (error) {
@@ -154,8 +155,8 @@ const AnalyticsPanel = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header optimizado para móvil y desktop */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm p-4 rounded-lg border border-siclo-light/30">
+      {/* Header con título a la izquierda y botones a la derecha */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-siclo-dark flex items-center">
             <BarChart3 className="h-5 w-5 mr-2" />
@@ -164,6 +165,24 @@ const AnalyticsPanel = () => {
           <p className="text-sm text-siclo-dark/70 mt-1">
             Estadísticas detalladas y reportes de rendimiento
           </p>
+        </div>
+        <div className="bg-siclo-light-blue p-1 rounded-lg flex self-center sm:self-auto">
+          <Button
+            onClick={() => setActiveView('ratings')}
+            variant={activeView === 'ratings' ? 'siclo-blue' : 'ghost'}
+            className="w-full sm:w-auto"
+          >
+            <Star className="h-4 w-4 mr-2" />
+            Calificaciones
+          </Button>
+          <Button
+            onClick={() => setActiveView('complaints')}
+            variant={activeView === 'complaints' ? 'siclo-orange' : 'ghost'}
+            className="w-full sm:w-auto"
+          >
+            <MessageSquareText className="h-4 w-4 mr-2" />
+            Sugerencias
+          </Button>
         </div>
       </div>
 
@@ -231,15 +250,6 @@ const AnalyticsPanel = () => {
             )}
 
             {/* Indicador de período */}
-            <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-siclo-green/10 text-siclo-green text-xs font-medium flex-shrink-0">
-              <Calendar className="w-3 h-3" />
-              <span className="hidden sm:inline">
-                {startDate || endDate ? 'Período filtrado' : 'Datos generales'}
-              </span>
-              <span className="sm:hidden">
-                {startDate || endDate ? 'Filtrado' : 'General'}
-              </span>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -250,368 +260,191 @@ const AnalyticsPanel = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Estadísticas principales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Total Quejas */}
-            <Card className="siclo-card hover:shadow-lg transition-all duration-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-siclo-dark/70">
-                  Total de Quejas
-                </CardTitle>
-                <MessageSquareText className="h-4 w-4 text-siclo-green" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-siclo-dark">
-                  {complaintStats?.total || 0}
-                </div>
-                <p className="text-xs text-siclo-dark/60 mt-1">
-                  Quejas registradas
-                </p>
-                {complaintStats?.resolutionRate !== undefined && (
-                  <div className="flex items-center mt-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${
-                        complaintStats.resolutionRate >= 80 ? 'border-emerald-300 text-emerald-700' :
-                        complaintStats.resolutionRate >= 60 ? 'border-amber-300 text-amber-700' :
-                        'border-red-300 text-red-700'
-                      }`}
-                    >
-                      {complaintStats.resolutionRate.toFixed(1)}% resueltas
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Complaints View */}
+          {activeView === 'complaints' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Estadísticas principales de Sugerencias */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="siclo-card hover:shadow-lg transition-all duration-200">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-siclo-dark/70">Total de Sugerencias</CardTitle>
+                    <MessageSquareText className="h-4 w-4 text-siclo-green" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-siclo-dark">{complaintStats?.total || 0}</div>
+                    <p className="text-xs text-siclo-dark/60 mt-1">Sugerencias registradas</p>
+                    {complaintStats?.resolutionRate !== undefined && (
+                      <div className="flex items-center mt-2">
+                        <Badge variant="outline" className={`text-xs ${complaintStats.resolutionRate >= 80 ? 'border-emerald-300 text-emerald-700' : complaintStats.resolutionRate >= 60 ? 'border-amber-300 text-amber-700' : 'border-red-300 text-red-700'}`}>
+                          {complaintStats.resolutionRate.toFixed(1)}% resueltas
+                        </Badge>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Total Calificaciones */}
-            <Card className="siclo-card hover:shadow-lg transition-all duration-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-siclo-dark/70">
-                  Total Calificaciones
-                </CardTitle>
-                <Star className="h-4 w-4 text-amber-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-siclo-dark">
-                  {ratingStats?.totalRatings || 0}
-                </div>
-                <p className="text-xs text-siclo-dark/60 mt-1">
-                  Evaluaciones completadas
-                </p>
-                {ratingStats?.averages?.nps && (
-                  <div className="flex items-center mt-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${
-                        ratingStats.averages.nps >= 70 ? 'border-emerald-300 text-emerald-700' :
-                        ratingStats.averages.nps >= 50 ? 'border-amber-300 text-amber-700' :
-                        'border-red-300 text-red-700'
-                      }`}
-                    >
-                      NPS: {ratingStats.averages.nps.toFixed(1)}
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Promedio General */}
-            <Card className="siclo-card hover:shadow-lg transition-all duration-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-siclo-dark/70">
-                  Promedio General
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-siclo-blue" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-siclo-dark">
-                  {ratingStats?.averages?.overall ? ratingStats.averages.overall.toFixed(1) : '--'}
-                  {ratingStats?.averages?.overall && (
-                    <span className="text-sm text-siclo-dark/60 ml-1">/ 5</span>
-                  )}
-                </div>
-                <p className="text-xs text-siclo-dark/60 mt-1">
-                  Calificación promedio
-                </p>
-                {ratingStats?.averages?.overall && (
-                  <div className="flex items-center mt-2">
-                    <Badge 
-                      variant="outline" 
-                      className="text-xs border-siclo-green text-siclo-green"
-                    >
-                      {((ratingStats.averages.overall / 5) * 100).toFixed(0)}% satisfacción
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Indicador de Rendimiento */}
-            <Card className="siclo-card hover:shadow-lg transition-all duration-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-siclo-dark/70">
-                  Rendimiento
-                </CardTitle>
-                <Target className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-siclo-dark">
-                  {ratingStats?.averages?.instructor ? ratingStats.averages.instructor.toFixed(1) : '--'}
-                </div>
-                <p className="text-xs text-siclo-dark/60 mt-1">
-                  Calificación instructores
-                </p>
-                {ratingStats?.averages?.instructor && (
-                  <div className="grid grid-cols-2 gap-1 mt-2 text-xs">
-                    <div className="text-siclo-dark/60">Limpieza: {ratingStats.averages.cleanliness?.toFixed(1) || '--'}</div>
-                    <div className="text-siclo-dark/60">Audio: {ratingStats.averages.audio?.toFixed(1) || '--'}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Gráficos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico de Estados de Quejas */}
-            <Card className="siclo-card">
-              <CardHeader>
-                <CardTitle className="flex items-center text-siclo-dark">
-                  <PieChart className="h-5 w-5 mr-2" />
-                  Estados de Quejas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statusData.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={statusData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {statusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-siclo-dark/60">
-                    <div className="text-center">
-                      <MessageSquareText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay datos de quejas para mostrar</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Gráfico de Prioridades */}
-            <Card className="siclo-card">
-              <CardHeader>
-                <CardTitle className="flex items-center text-siclo-dark">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  Prioridades de Quejas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {priorityData.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={priorityData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {priorityData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-siclo-dark/60">
-                    <div className="text-center">
-                      <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay datos de prioridades para mostrar</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Rankings de Sucursales e Instructores */}
-          {!startDate && !endDate && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Sucursales */}
-              <Card className="siclo-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-siclo-dark">
-                    <Store className="h-5 w-5 mr-2" />
-                    Rendimiento por Sucursal
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {branchRatings.length > 0 ? (
-                    <div className="space-y-3">
-                      {branchRatings
-                        .sort((a, b) => b.avgRating - a.avgRating)
-                        .slice(0, 5)
-                        .map((branch, index) => (
-                          <div key={branch.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                                index === 0 ? 'bg-yellow-500' :
-                                index === 1 ? 'bg-gray-400' :
-                                index === 2 ? 'bg-amber-600' :
-                                'bg-gray-300'
-                              }`}>
-                                {index + 1}
-                              </div>
-                              <div>
-                                <p className="font-medium text-siclo-dark">{branch.name}</p>
-                                <p className="text-xs text-siclo-dark/60">{branch.ratingsCount} evaluaciones</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-siclo-dark">
-                                {branch.avgRating > 0 ? branch.avgRating.toFixed(1) : '--'}
-                              </div>
-                              <div className="text-xs text-siclo-dark/60">Promedio</div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center text-siclo-dark/60 py-8">
-                      <Building2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay datos de sucursales para mostrar</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Top Instructores */}
-              <Card className="siclo-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-siclo-dark">
-                    <GraduationCap className="h-5 w-5 mr-2" />
-                    Top Instructores
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {instructorRatings.length > 0 ? (
-                    <div className="space-y-3">
-                      {instructorRatings
-                        .sort((a, b) => b.avgRating - a.avgRating)
-                        .slice(0, 5)
-                        .map((instructor, index) => (
-                          <div key={instructor.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                                index === 0 ? 'bg-yellow-500' :
-                                index === 1 ? 'bg-gray-400' :
-                                index === 2 ? 'bg-amber-600' :
-                                'bg-gray-300'
-                              }`}>
-                                {index + 1}
-                              </div>
-                              <div>
-                                <p className="font-medium text-siclo-dark">{instructor.name}</p>
-                                <p className="text-xs text-siclo-dark/60">{instructor.ratingsCount} evaluaciones</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-siclo-dark">
-                                {instructor.avgRating > 0 ? instructor.avgRating.toFixed(1) : '--'}
-                              </div>
-                              <div className="text-xs text-siclo-dark/60">Promedio</div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center text-siclo-dark/60 py-8">
-                      <GraduationCap className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay datos de instructores para mostrar</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Gráficos de Sugerencias */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="siclo-card">
+                  <CardHeader><CardTitle className="flex items-center text-siclo-dark"><PieChart className="h-5 w-5 mr-2" />Estados de Sugerencias</CardTitle></CardHeader>
+                  <CardContent>
+                    {statusData.length > 0 ? (
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie data={statusData} cx="50%" cy="50%" labelLine={false} label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                              {statusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                            </Pie>
+                            <Tooltip formatter={(value) => [value, 'Sugerencias']} />
+                            <Legend iconType="circle" />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="text-center text-siclo-dark/60 py-8"><PieChart className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de estado para mostrar</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="siclo-card">
+                  <CardHeader><CardTitle className="flex items-center text-siclo-dark"><AlertTriangle className="h-5 w-5 mr-2" />Prioridad de Sugerencias</CardTitle></CardHeader>
+                  <CardContent>
+                    {priorityData.length > 0 ? (
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={priorityData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" hide />
+                            <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={80} />
+                            <Tooltip cursor={{ fill: 'rgba(240, 240, 240, 0.5)' }} formatter={(value) => [value, 'Sugerencias']} />
+                            <Bar dataKey="value" barSize={20} radius={[0, 4, 4, 0]}>
+                              {priorityData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="text-center text-siclo-dark/60 py-8"><AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de prioridad para mostrar</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
 
-          {/* Detalles de Calificaciones */}
-          {ratingStats?.averages && (
-            <Card className="siclo-card">
-              <CardHeader>
-                <CardTitle className="flex items-center text-siclo-dark">
-                  <Star className="h-5 w-5 mr-2" />
-                  Desglose de Calificaciones
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {ratingStats.averages.instructor?.toFixed(1) || '--'}
+          {/* Ratings View */}
+          {activeView === 'ratings' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Main Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="siclo-card hover:shadow-lg transition-all duration-200 lg:col-span-1">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-siclo-dark/70">Total Calificaciones</CardTitle>
+                    <Star className="h-4 w-4 text-amber-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-siclo-dark">{ratingStats?.totalRatings || 0}</div>
+                    <p className="text-xs text-siclo-dark/60 mt-1">Evaluaciones completadas</p>
+                  </CardContent>
+                </Card>
+                <Card className="siclo-card hover:shadow-lg transition-all duration-200 lg:col-span-1">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-siclo-dark/70">Promedio General</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-siclo-blue" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-siclo-dark">
+                      {ratingStats?.averages?.overall ? ratingStats.averages.overall.toFixed(1) : '--'}
+                      {ratingStats?.averages?.overall && <span className="text-sm text-siclo-dark/60 ml-1">/ 10</span>}
                     </div>
-                    <div className="text-sm text-blue-700 font-medium">Instructor</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {ratingStats.averages.cleanliness?.toFixed(1) || '--'}
+                    <p className="text-xs text-siclo-dark/60 mt-1">Satisfacción general</p>
+                  </CardContent>
+                </Card>
+                <Card className="siclo-card hover:shadow-lg transition-all duration-200 lg:col-span-1">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-siclo-dark/70">NPS</CardTitle>
+                    <Target className="h-4 w-4 text-purple-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-siclo-dark">{ratingStats?.averages?.nps ? ratingStats.averages.nps.toFixed(1) : '--'}</div>
+                    <p className="text-xs text-siclo-dark/60 mt-1">Net Promoter Score</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Detailed Ratings Breakdown */}
+              {ratingStats?.averages && (
+                <Card className="siclo-card">
+                  <CardHeader><CardTitle className="flex items-center text-siclo-dark"><BarChart3 className="h-5 w-5 mr-2" />Desglose de Calificaciones</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg"><div className="text-2xl font-bold text-blue-600">{ratingStats.averages.instructor?.toFixed(1) || '--'}</div><div className="text-sm text-blue-700 font-medium">Instructor</div></div>
+                      <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg"><div className="text-2xl font-bold text-green-600">{ratingStats.averages.cleanliness?.toFixed(1) || '--'}</div><div className="text-sm text-green-700 font-medium">Limpieza</div></div>
+                      <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg"><div className="text-2xl font-bold text-purple-600">{ratingStats.averages.audio?.toFixed(1) || '--'}</div><div className="text-sm text-purple-700 font-medium">Audio</div></div>
+                      <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg"><div className="text-2xl font-bold text-yellow-600">{ratingStats.averages.attentionQuality?.toFixed(1) || '--'}</div><div className="text-sm text-yellow-700 font-medium">Atención</div></div>
+                      <div className="text-center p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg"><div className="text-2xl font-bold text-indigo-600">{ratingStats.averages.amenities?.toFixed(1) || '--'}</div><div className="text-sm text-indigo-700 font-medium">Comodidades</div></div>
+                      <div className="text-center p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-lg"><div className="text-2xl font-bold text-cyan-600">{ratingStats.averages.punctuality?.toFixed(1) || '--'}</div><div className="text-sm text-cyan-700 font-medium">Puntualidad</div></div>
                     </div>
-                    <div className="text-sm text-green-700 font-medium">Limpieza</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {ratingStats.averages.audio?.toFixed(1) || '--'}
-                    </div>
-                    <div className="text-sm text-purple-700 font-medium">Audio</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {ratingStats.averages.attentionQuality?.toFixed(1) || '--'}
-                    </div>
-                    <div className="text-sm text-yellow-700 font-medium">Atención</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg">
-                    <div className="text-2xl font-bold text-indigo-600">
-                      {ratingStats.averages.amenities?.toFixed(1) || '--'}
-                    </div>
-                    <div className="text-sm text-indigo-700 font-medium">Comodidades</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-lg">
-                    <div className="text-2xl font-bold text-cyan-600">
-                      {ratingStats.averages.punctuality?.toFixed(1) || '--'}
-                    </div>
-                    <div className="text-sm text-cyan-700 font-medium">Puntualidad</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Rankings */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="siclo-card">
+                  <CardHeader><CardTitle className="flex items-center text-siclo-dark"><Store className="h-5 w-5 mr-2" />Ranking de Sucursales (NPS)</CardTitle></CardHeader>
+                  <CardContent>
+                    {branchRatings.length > 0 ? (
+                      <div className="space-y-3">
+                        {branchRatings.sort((a, b) => b.avgRating - a.avgRating).map((branch, index) => (
+                          <div key={branch.id} className="flex items-center justify-between p-2 rounded-lg bg-siclo-light-blue/50">
+                            <div className="flex items-center">
+                              <span className={`w-6 text-center font-bold mr-3 text-sm ${index < 3 ? 'text-siclo-orange' : 'text-siclo-dark/60'}`}>{index + 1}</span>
+                              <div>
+                                <div className="font-semibold text-siclo-dark">{branch.name}</div>
+                                <div className="text-xs text-siclo-dark/60">{branch.ratingsCount} calificaciones</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-siclo-dark">{branch.avgRating > 0 ? branch.avgRating.toFixed(1) : '--'}</div>
+                              <div className="text-xs text-siclo-dark/60">Promedio</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center text-siclo-dark/60 py-8"><Store className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de sucursales para mostrar</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="siclo-card">
+                  <CardHeader><CardTitle className="flex items-center text-siclo-dark"><GraduationCap className="h-5 w-5 mr-2" />Ranking de Instructores</CardTitle></CardHeader>
+                  <CardContent>
+                    {instructorRatings.length > 0 ? (
+                      <div className="space-y-3">
+                        {instructorRatings.sort((a, b) => b.avgRating - a.avgRating).map((instructor, index) => (
+                          <div key={instructor.id} className="flex items-center justify-between p-2 rounded-lg bg-siclo-light-blue/50">
+                            <div className="flex items-center">
+                              <span className={`w-6 text-center font-bold mr-3 text-sm ${index < 3 ? 'text-siclo-orange' : 'text-siclo-dark/60'}`}>{index + 1}</span>
+                              <div>
+                                <div className="font-semibold text-siclo-dark">{instructor.name}</div>
+                                <div className="text-xs text-siclo-dark/60">{instructor.ratingsCount} calificaciones</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-siclo-dark">{instructor.avgRating > 0 ? instructor.avgRating.toFixed(1) : '--'}</div>
+                              <div className="text-xs text-siclo-dark/60">Promedio</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center text-siclo-dark/60 py-8"><GraduationCap className="h-12 w-12 mx-auto mb-2 opacity-50" /><p>No hay datos de instructores para mostrar</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -619,4 +452,4 @@ const AnalyticsPanel = () => {
   );
 };
 
-export default AnalyticsPanel; 
+export default AnalyticsPanel;

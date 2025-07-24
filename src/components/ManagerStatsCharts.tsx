@@ -102,7 +102,7 @@ const ManagerStatsCharts = ({ complaints, ratings, dateRange }: ManagerStatsChar
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-siclo-dark/70">Total Quejas</p>
+                <p className="text-sm font-medium text-siclo-dark/70">Total Sugerencias</p>
                 <p className="text-2xl font-bold text-siclo-dark">{filteredComplaints.length}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -151,7 +151,7 @@ const ManagerStatsCharts = ({ complaints, ratings, dateRange }: ManagerStatsChar
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="siclo-card">
           <CardHeader>
-            <CardTitle className="text-siclo-dark">Estado de Quejas</CardTitle>
+            <CardTitle className="text-siclo-dark">Estado de Sugerencias</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

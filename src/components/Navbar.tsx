@@ -124,29 +124,59 @@ const Navbar = () => {
     }`}>
       <div className="container flex h-16 items-center justify-between px-6 md:px-16">
         <div className="flex items-center space-x-12">
-          <Link to="/" className="flex items-center space-x-2">
-            <img 
-              src="/logo.svg" 
-              alt="Siclo Logo" 
-              className={`h-6 w-auto transition-all duration-300 ${
-                isLoginPage ? 'filter brightness-0 invert' : ''
-              }`}
-            />
-          </Link>
+                               <div className="flex flex-col items-center">
+            {/* Logo clickeable solo si no estamos en complaints o ratings */}
+            {location.pathname !== '/complaints' && location.pathname !== '/ratings' ? (
+              <Link to="/" className="flex items-center space-x-2">
+                <img 
+                  src="/logo.svg" 
+                  alt="Siclo Logo" 
+                  className={`h-6 w-auto transition-all duration-300 ${
+                    isLoginPage ? 'filter brightness-0 invert' : ''
+                  }`}
+                />
+              </Link>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <img 
+                  src="/logo.svg" 
+                  alt="Siclo Logo" 
+                  className={`h-6 w-auto transition-all duration-300 ${
+                    isLoginPage ? 'filter brightness-0 invert' : ''
+                  }`}
+                />
+              </div>
+            )}
+            {/* Texto pequeño debajo del logo según la pestaña */}
+            {location.pathname === '/complaints' && (
+              <span className={`text-xs mt-1 ${
+                isLoginPage ? 'text-white/60' : 'text-gray-500'
+              }`}>
+                sugerencias
+              </span>
+            )}
+            {location.pathname === '/ratings' && (
+              <span className={`text-xs mt-1 ${
+                isLoginPage ? 'text-white/60' : 'text-gray-500'
+              }`}>
+                calificaciones
+              </span>
+            )}
+          </div>
           
-          {/* Desktop Navigation - Solo para usuarios no autenticados */}
+          {/* Desktop Navigation - Solo para usuarios no autenticados y no en complaints/ratings */}
           <nav className="hidden md:flex items-center space-x-12 mt-1">
-            {/* Navegación para usuarios no registrados */}
-            {!isAuthenticated && (
+            {/* Navegación para usuarios no registrados - ocultar en complaints y ratings */}
+            {!isAuthenticated && location.pathname !== '/complaints' && location.pathname !== '/ratings' && (
               <>
                 <Link to="/" className={getLinkClasses()}>
                   Inicio
                 </Link>
                 <Link to="/complaints" className={getLinkClasses()}>
-                  Registrar Queja
+                  Registrar Observación
                 </Link>
                 <Link to="/ratings" className={getLinkClasses()}>
-                  Calificar Instructor
+                  Calificar Clase
                 </Link>
               </>
             )}
@@ -188,7 +218,7 @@ const Navbar = () => {
                               className={getMobileLinkClasses(location.pathname === '/admin' && isCurrentTab('complaints'))}
                             >
                               <MessageSquareText className="h-5 w-5" />
-                              <span className="text-sm">Quejas</span>
+                              <span className="text-sm">Sugerencias</span>
                             </button>
                             <button
                               onClick={() => handleNavigation('/admin?tab=ratings')}
@@ -236,7 +266,7 @@ const Navbar = () => {
                               className={getMobileLinkClasses(location.pathname === '/manager' && isCurrentTab('complaints'))}
                             >
                               <MessageSquareText className="h-5 w-5" />
-                              <span className="text-sm">Quejas</span>
+                              <span className="text-sm">Sugerencias</span>
                             </button>
                             <button
                               onClick={() => handleNavigation('/manager?tab=ratings')}
@@ -268,28 +298,32 @@ const Navbar = () => {
                       </>
                     ) : (
                       <>
-                        {/* Navegación para usuarios no registrados */}
-                        <button
-                          onClick={() => handleNavigation('/')}
-                          className={getMobileLinkClasses(isCurrentPath('/'))}
-                        >
-                          <Home className="h-5 w-5" />
-                          <span className="text-sm">Inicio</span>
-                        </button>
-                        <button
-                          onClick={() => handleNavigation('/complaints')}
-                          className={getMobileLinkClasses(isCurrentPath('/complaints'))}
-                        >
-                          <MessageSquareText className="h-5 w-5" />
-                          <span className="text-sm">Registrar Queja</span>
-                        </button>
-                        <button
-                          onClick={() => handleNavigation('/ratings')}
-                          className={getMobileLinkClasses(isCurrentPath('/ratings'))}
-                        >
-                          <Star className="h-5 w-5" />
-                          <span className="text-sm">Calificar Instructor</span>
-                        </button>
+                        {/* Navegación para usuarios no registrados - ocultar en complaints y ratings */}
+                        {location.pathname !== '/complaints' && location.pathname !== '/ratings' && (
+                          <>
+                            <button
+                              onClick={() => handleNavigation('/')}
+                              className={getMobileLinkClasses(isCurrentPath('/'))}
+                            >
+                              <Home className="h-5 w-5" />
+                              <span className="text-sm">Inicio</span>
+                            </button>
+                            <button
+                              onClick={() => handleNavigation('/complaints')}
+                              className={getMobileLinkClasses(isCurrentPath('/complaints'))}
+                            >
+                              <MessageSquareText className="h-5 w-5" />
+                              <span className="text-sm">Registrar Observación</span>
+                            </button>
+                            <button
+                              onClick={() => handleNavigation('/ratings')}
+                              className={getMobileLinkClasses(isCurrentPath('/ratings'))}
+                            >
+                              <Star className="h-5 w-5" />
+                              <span className="text-sm">Calificar Clase</span>
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -337,104 +371,110 @@ const Navbar = () => {
                           Cerrar sesión
                         </Button>
                       </div>
-                    ) : (
-                      <Button 
-                        onClick={() => handleNavigation('/login')}
-                        className="w-full bg-gradient-to-r from-siclo-orange via-siclo-purple to-siclo-deep-blue text-white font-medium"
-                      >
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Iniciar sesión
-                      </Button>
-                    )}
+                                         ) : (
+                       // Ocultar botón de login en complaints y ratings
+                       location.pathname !== '/complaints' && location.pathname !== '/ratings' && (
+                         <Button 
+                           onClick={() => handleNavigation('/login')}
+                           className="w-full bg-gradient-to-r from-siclo-orange via-siclo-purple to-siclo-deep-blue text-white font-medium"
+                         >
+                           <LogIn className="h-4 w-4 mr-2" />
+                           Iniciar sesión
+                         </Button>
+                       )
+                     )}
                   </div>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
 
-          {/* Desktop User Section */}
-          <div className="hidden md:block">
-            {loading ? (
-              <div className="flex items-center space-x-2">
-                <LoadingSpinner size="sm" />
-                <span className={`text-sm ${isLoginPage ? 'text-white/70' : 'text-muted-foreground'}`}>
-                  Cargando...
-                </span>
-              </div>
-            ) : isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className={`relative flex items-center space-x-3 px-3 bg-gray-100/65 py-2 h-auto rounded-lg hover:bg-gray-100 transition-colors ${
-                      isLoginPage ? 'text-white hover:bg-white/10' : 'text-gray-700'
-                    }`}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.image} alt={user?.name} />
-                      <AvatarFallback className="bg-siclo-deep-blue text-white">
-                        {getInitials(user?.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col items-start text-left">
-                      <div className="flex items-center space-x-1">
-                        {getRoleIcon(user?.role)}
-                        <span className={`text-sm font-medium ${
-                          isLoginPage ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          {user?.name}
-                        </span>
-                      </div>
-                      <span className={`text-xs ${
-                        isLoginPage ? 'text-white/70' : 'text-gray-500'
-                      }`}>
-                        {getRoleText(user?.role)}
-                      </span>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-2">
-                        {getRoleIcon(user?.role)}
-                        <p className="text-sm font-medium leading-none">{user?.name}</p>
-                      </div>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email}
-                      </p>
-                      <p className="text-xs leading-none text-siclo-green font-medium">
-                        {getRoleText(user?.role)}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate(getDashboardRoute(user?.role))}>
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    <span>Mi Dashboard</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Cerrar sesión</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/login')}
-                className={`transition-all duration-300 ${
-                  isLoginPage 
-                    ? 'border-white/30 text-white/90 bg-transparent hover:bg-white hover:text-gray-900' 
-                    : 'border-siclo-deep-blue bg-transparent text-siclo-deep-blue hover:bg-gradient-to-r hover:from-siclo-deep-blue hover:to-siclo-purple hover:text-white'
-                }`}
-              >
-                <LogIn className="h-4 w-4 mr-2" />
-                Iniciar sesión
-              </Button>
-            )}
-          </div>
+                     {/* Desktop User Section */}
+           <div className="hidden md:block">
+             {loading ? (
+               <div className="flex items-center space-x-2">
+                 <LoadingSpinner size="sm" />
+                 <span className={`text-sm ${isLoginPage ? 'text-white/70' : 'text-muted-foreground'}`}>
+                   Cargando...
+                 </span>
+               </div>
+             ) : isAuthenticated ? (
+               <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                   <Button 
+                     variant="ghost" 
+                     className={`relative flex items-center space-x-3 px-3 bg-gray-100/65 py-2 h-auto rounded-lg hover:bg-gray-100 transition-colors ${
+                       isLoginPage ? 'text-white hover:bg-white/10' : 'text-gray-700'
+                     }`}
+                   >
+                     <Avatar className="h-8 w-8">
+                       <AvatarImage src={user?.image} alt={user?.name} />
+                       <AvatarFallback className="bg-siclo-deep-blue text-white">
+                         {getInitials(user?.name)}
+                       </AvatarFallback>
+                     </Avatar>
+                     <div className="flex flex-col items-start text-left">
+                       <div className="flex items-center space-x-1">
+                         {getRoleIcon(user?.role)}
+                         <span className={`text-sm font-medium ${
+                           isLoginPage ? 'text-white' : 'text-gray-900'
+                         }`}>
+                           {user?.name}
+                         </span>
+                       </div>
+                       <span className={`text-xs ${
+                         isLoginPage ? 'text-white/70' : 'text-gray-500'
+                       }`}>
+                         {getRoleText(user?.role)}
+                       </span>
+                     </div>
+                   </Button>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent className="w-56" align="end" forceMount>
+                   <DropdownMenuLabel className="font-normal">
+                     <div className="flex flex-col space-y-1">
+                       <div className="flex items-center space-x-2">
+                         {getRoleIcon(user?.role)}
+                         <p className="text-sm font-medium leading-none">{user?.name}</p>
+                       </div>
+                       <p className="text-xs leading-none text-muted-foreground">
+                         {user?.email}
+                       </p>
+                       <p className="text-xs leading-none text-siclo-green font-medium">
+                         {getRoleText(user?.role)}
+                       </p>
+                     </div>
+                   </DropdownMenuLabel>
+                   <DropdownMenuSeparator />
+                   <DropdownMenuItem onClick={() => navigate(getDashboardRoute(user?.role))}>
+                     <BarChart3 className="mr-2 h-4 w-4" />
+                     <span>Mi Dashboard</span>
+                   </DropdownMenuItem>
+                   <DropdownMenuSeparator />
+                   <DropdownMenuItem onClick={handleLogout}>
+                     <LogOut className="mr-2 h-4 w-4" />
+                     <span>Cerrar sesión</span>
+                   </DropdownMenuItem>
+                 </DropdownMenuContent>
+               </DropdownMenu>
+             ) : (
+               // Ocultar botón de login en complaints y ratings
+               location.pathname !== '/complaints' && location.pathname !== '/ratings' && (
+                 <Button 
+                   variant="outline" 
+                   onClick={() => navigate('/login')}
+                   className={`transition-all duration-300 ${
+                     isLoginPage 
+                       ? 'border-white/30 text-white/90 bg-transparent hover:bg-white hover:text-gray-900' 
+                       : 'border-siclo-deep-blue bg-transparent text-siclo-deep-blue hover:bg-gradient-to-r hover:from-siclo-deep-blue hover:to-siclo-purple hover:text-white'
+                   }`}
+                 >
+                   <LogIn className="h-4 w-4 mr-2" />
+                   Iniciar sesión
+                 </Button>
+               )
+             )}
+           </div>
         </div>
       </div>
     </header>

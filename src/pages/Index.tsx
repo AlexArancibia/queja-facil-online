@@ -31,10 +31,10 @@ const Index = () => {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8 sm:mb-8 ">
           <h2 className="text-4xl font-bold text-siclo-dark mb-4 mt-16 sm:mt-24">
-            Reporta tu experiencia
+            Reporta tu sugerencia
           </h2>
           <p className="text-base sm:text-lg text-siclo-dark/70 max-w-2xl mx-auto leading-relaxed mt-4 sm:mt-8">
-            Tu opinión es importante. Reporta cualquier incidencia y ayúdanos a mejorar nuestro servicio.
+            Tu opinión es importante. Ayúdanos a mejorar nuestro servicio.
           </p>
         </div>
 
@@ -52,7 +52,7 @@ const Index = () => {
                 }`}
               >
                 <MessageSquareText className="h-4 w-4 mr-2" />
-                Crear Queja
+                Crear Sugerencia
               </Button>
               <Button
                 variant={activeTab === 'search' ? 'default' : 'ghost'}
@@ -64,7 +64,7 @@ const Index = () => {
                 }`}
               >
                 <Search className="h-4 w-4 mr-2" />
-                Buscar Queja
+                Buscar Sugerencia
               </Button>
             </div>
           </div>

@@ -374,7 +374,7 @@ const AdminPanel = () => {
         setDeletingItem(id);
         await deleteComplaint(id);
         toast({
-          title: "Queja eliminada",
+          title: "Sugerencia eliminada",
           description: "La queja ha sido eliminada exitosamente",
         });
       } catch (error: any) {
@@ -605,7 +605,7 @@ const AdminPanel = () => {
           <TabsList className="  w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14 hidden md:grid">
             <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <MessageSquareText className="h-4 w-4 mr-2" />
-              Quejas
+              Sugerencias
             </TabsTrigger>
             <TabsTrigger value="ratings" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <Star className="h-4 w-4 mr-2" />
@@ -731,7 +731,7 @@ const AdminPanel = () => {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-siclo-dark">
-                    Quejas ({complaintsPagination.total || complaints.length})
+                    Sugerencias ({complaintsPagination.total || complaints.length})
                   </CardTitle>
                   <Badge variant="outline" className="border-siclo-green text-siclo-green">
                     Página {complaintsCurrentPage} de {complaintsTotalPages}
@@ -1143,13 +1143,13 @@ const AdminPanel = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs text-gray-600 hidden lg:table-cell">
-                                {item.instructorRating}/5
+                                {item.instructorRating}/10
                               </TableCell>
                               <TableCell className="text-xs text-gray-600 hidden xl:table-cell">
-                                {item.cleanlinessRating}/5
+                                {item.cleanlinessRating}/10
                               </TableCell>
                               <TableCell className="text-xs text-gray-600 hidden xl:table-cell">
-                                {item.audioRating}/5
+                                {item.audioRating}/10
                               </TableCell>
                               <TableCell>
                                 <DropdownMenu>
@@ -1485,7 +1485,7 @@ const AdminPanel = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {selectedDetail?.type === 'complaint' ? 'Detalle de Queja' : 'Detalle de Calificación'}
+              {selectedDetail?.type === 'complaint' ? 'Detalle de Sugerencia' : 'Detalle de Calificación'}
               {selectedDetail?.type === 'complaint' && (
                 <Badge className={`${getStatusColor(selectedDetail.status)} text-xs`}>
                   {getStatusText(selectedDetail.status)}
@@ -1498,7 +1498,7 @@ const AdminPanel = () => {
               {/* Header con badges y fecha */}
               <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
                 <Badge variant="outline" className="text-sm">
-                  {selectedDetail.type === 'complaint' ? 'Queja' : 'Calificación'}
+                  {selectedDetail.type === 'complaint' ? 'Sugerencia' : 'Calificación'}
                 </Badge>
                 {selectedDetail.type === 'rating' && (
                   <Badge className="bg-amber-100 text-amber-800 border-amber-200">
@@ -1518,7 +1518,7 @@ const AdminPanel = () => {
               </div>
 
               {selectedDetail.type === 'complaint' ? (
-                /* Contenido de Queja */
+                /* Contenido de Sugerencia */
                 <div className="space-y-6">
                   {/* Información principal */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1541,7 +1541,7 @@ const AdminPanel = () => {
                     </Card>
 
                     <Card className="p-4">
-                      <h4 className="font-semibold text-siclo-dark mb-3">Información de la Queja</h4>
+                      <h4 className="font-semibold text-siclo-dark mb-3">Información de la Sugerencia</h4>
                       <div className="space-y-2 text-sm">
                         <div>
                           <span className="font-medium text-gray-600">Tipo:</span>
@@ -1572,7 +1572,7 @@ const AdminPanel = () => {
 
                   {/* Detalle de la queja */}
                   <Card className="p-4">
-                    <h4 className="font-semibold text-siclo-dark mb-3">Detalle de la Queja</h4>
+                    <h4 className="font-semibold text-siclo-dark mb-3">Detalle de la Sugerencia</h4>
                     <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 leading-relaxed">
                       {selectedDetail.detail}
                     </div>
@@ -1642,27 +1642,27 @@ const AdminPanel = () => {
                         <div className="text-gray-600 text-xs">NPS Score</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-blue-600">{selectedDetail.instructorRating}/5</div>
+                        <div className="font-medium text-lg text-blue-600">{selectedDetail.instructorRating}/10</div>
                         <div className="text-gray-600 text-xs">Instructor</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-green-600">{selectedDetail.cleanlinessRating}/5</div>
+                        <div className="font-medium text-lg text-green-600">{selectedDetail.cleanlinessRating}/10</div>
                         <div className="text-gray-600 text-xs">Limpieza</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-purple-600">{selectedDetail.audioRating}/5</div>
+                        <div className="font-medium text-lg text-purple-600">{selectedDetail.audioRating}/10</div>
                         <div className="text-gray-600 text-xs">Audio</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-red-600">{selectedDetail.attentionQualityRating}/5</div>
+                        <div className="font-medium text-lg text-red-600">{selectedDetail.attentionQualityRating}/10</div>
                         <div className="text-gray-600 text-xs">Atención</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-indigo-600">{selectedDetail.amenitiesRating}/5</div>
+                        <div className="font-medium text-lg text-indigo-600">{selectedDetail.amenitiesRating}/10</div>
                         <div className="text-gray-600 text-xs">Comodidades</div>
                       </div>
                       <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <div className="font-medium text-lg text-cyan-600">{selectedDetail.punctualityRating}/5</div>
+                        <div className="font-medium text-lg text-cyan-600">{selectedDetail.punctualityRating}/10</div>
                         <div className="text-gray-600 text-xs">Puntualidad</div>
                       </div>
                     </div>

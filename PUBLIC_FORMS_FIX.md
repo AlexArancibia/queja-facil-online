@@ -66,14 +66,14 @@ Los usuarios no registrados no podían acceder a los formularios de quejas y cal
 ## 🔧 **Lógica de Navegación**
 
 ### **Navbar Actualizado**
-- **No Registrados**: "Registrar Queja" y "Calificar" enlaces directos
+- **No Registrados**: "Registrar Sugerencia" y "Calificar" enlaces directos
 - **Registrados**: "Dashboard" específico según rol
 - **Admin**: Acceso adicional a gestión de quejas/calificaciones
 
 ### **Flujo de Usuario**
 ```
 No Registrado:
-Inicio → Registrar Queja (público) → Calificar (público)
+Inicio → Registrar Sugerencia (público) → Calificar (público)
 
 Manager:
 Inicio → Dashboard (protegido) → Gestión de sucursal
