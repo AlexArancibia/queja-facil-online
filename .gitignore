@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+/public/WindsurfUserSetup-x64-1.11.0.exe
