@@ -80,12 +80,13 @@ const RatingForm = () => {
     }
   }, [fetchBranches, branches, branchesLoading]);
 
-  // Load instructors when branch changes
+  // Load all instructors when component mounts (no longer dependent on branch)
   useEffect(() => {
-    if (watchedBranch) {
-      fetchInstructors({ branchId: watchedBranch, active: true });
-    }
-  }, [watchedBranch, fetchInstructors]);
+    fetchInstructors({ active: true });
+  }, [fetchInstructors]);
+
+  // Load instructors when branch changes
+ 
 
   const onSubmit = async (data: RatingFormData) => {
     try {
@@ -302,7 +303,6 @@ const RatingForm = () => {
           </Label>
           <Select 
             onValueChange={(value) => setValue('instructorId', value)}
-            disabled={!watchedBranch}
             value={watchedInstructor}
           >
             <SelectTrigger className="border-border focus:border-border focus:ring-siclo-green/20 text-sm">
@@ -320,7 +320,7 @@ const RatingForm = () => {
               ) : (
                 <SelectItem value="no-instructors" disabled>
                   <span className="text-slate-500">
-                    {watchedBranch ? 'No hay instructores disponibles' : 'Selecciona un local primero'}
+                    No hay instructores disponibles
                   </span>
                 </SelectItem>
               )}

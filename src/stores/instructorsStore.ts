@@ -13,7 +13,7 @@ interface InstructorsState {
   error: string | null;
   
   // Actions
-  fetchInstructors: (params?: { branchId?: string; active?: boolean }) => Promise<void>;
+  fetchInstructors: (params?: { active?: boolean }) => Promise<void>;
   createInstructor: (instructor: CreateInstructorDto) => Promise<Instructor>;
   updateInstructor: (id: string, updates: UpdateInstructorDto) => Promise<Instructor>;
   deleteInstructor: (id: string) => Promise<void>;
@@ -31,7 +31,6 @@ export const useInstructorsStore = create<InstructorsState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const searchParams = new URLSearchParams();
-      if (params?.branchId) searchParams.append('branchId', params.branchId);
       if (params?.active !== undefined) searchParams.append('active', params.active.toString());
       
       const response = await apiClient.get<Instructor[]>(`/instructors?${searchParams.toString()}`);

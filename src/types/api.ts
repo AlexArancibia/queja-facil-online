@@ -79,11 +79,9 @@ export interface Instructor {
   email?: string;
   phone?: string;
   discipline: Discipline;
-  branchId: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  branch?: Branch;
 }
 
 export interface Complaint {
@@ -232,7 +230,6 @@ export interface CreateInstructorDto {
   email?: string;
   phone?: string;
   discipline: Discipline;
-  branchId: string;
   isActive?: boolean;
 }
 
@@ -241,7 +238,6 @@ export interface UpdateInstructorDto {
   email?: string;
   phone?: string;
   discipline?: Discipline;
-  branchId?: string;
   isActive?: boolean;
 }
 

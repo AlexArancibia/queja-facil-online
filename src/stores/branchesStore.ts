@@ -19,7 +19,6 @@ interface BranchesState {
   getBranchById: (id: string) => Promise<Branch>;
   getAllBranches: () => Promise<Branch[]>; // For dropdowns and selects
   getBranchUsers: (id: string) => Promise<any[]>;
-  getBranchInstructors: (id: string) => Promise<any[]>;
   getBranchComplaints: (id: string, status?: string) => Promise<any[]>;
   getBranchRatings: (id: string) => Promise<any[]>;
 }
@@ -105,15 +104,6 @@ export const useBranchesStore = create<BranchesState>((set, get) => ({
   getBranchUsers: async (id) => {
     try {
       const response = await apiClient.get<any[]>(`/branches/${id}/users`);
-      return response.data;
-    } catch (error: any) {
-      throw error;
-    }
-  },
-
-  getBranchInstructors: async (id) => {
-    try {
-      const response = await apiClient.get<any[]>(`/branches/${id}/instructors`);
       return response.data;
     } catch (error: any) {
       throw error;

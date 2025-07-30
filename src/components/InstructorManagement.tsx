@@ -19,7 +19,6 @@ import { useForm } from 'react-hook-form';
 interface InstructorFormData {
   name: string;
   discipline: Discipline;
-  branchId: string;
   email?: string;
   phone?: string;
 }
@@ -64,7 +63,6 @@ const InstructorManagement = () => {
         const updateData: UpdateInstructorDto = {
           name: data.name,
           discipline: data.discipline,
-          branchId: data.branchId,
           email: data.email || undefined,
           phone: data.phone || undefined
         };
@@ -77,7 +75,6 @@ const InstructorManagement = () => {
         const createData: CreateInstructorDto = {
           name: data.name,
           discipline: data.discipline,
-          branchId: data.branchId,
           email: data.email || undefined,
           phone: data.phone || undefined
         };
@@ -104,7 +101,6 @@ const InstructorManagement = () => {
     setEditingInstructor(instructor);
     setValue('name', instructor.name);
     setValue('discipline', instructor.discipline);
-    setValue('branchId', instructor.branchId);
     setValue('email', instructor.email || '');
     setValue('phone', instructor.phone || '');
     setIsDialogOpen(true);
@@ -267,10 +263,7 @@ const InstructorManagement = () => {
 
                           {/* Información del instructor */}
                           <div className="space-y-2 text-sm">
-                            <div className="flex items-center text-siclo-dark/70">
-                              <Store className="h-3 w-3 mr-2 flex-shrink-0 text-siclo-blue" />
-                              <span className="truncate">{getBranchName(instructor.branchId)}</span>
-                            </div>
+   
                             <div className="flex items-center">
                               <Badge className={`${getDisciplineColor(instructor.discipline)} border text-xs`}>
                                 {getDisciplineText(instructor.discipline)}
@@ -313,7 +306,6 @@ const InstructorManagement = () => {
                     <TableRow className="bg-gray-50/50">
                       <TableHead className="font-semibold text-siclo-dark">Instructor</TableHead>
                       <TableHead className="font-semibold text-siclo-dark">Disciplina</TableHead>
-                      <TableHead className="font-semibold text-siclo-dark">Sucursal</TableHead>
                       <TableHead className="font-semibold text-siclo-dark">Contacto</TableHead>
                       <TableHead className="font-semibold text-siclo-dark">Calificaciones</TableHead>
                       <TableHead className="font-semibold text-siclo-dark">Estado</TableHead>
@@ -339,12 +331,7 @@ const InstructorManagement = () => {
                             {getDisciplineText(instructor.discipline)}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center text-sm text-siclo-dark/70">
-                            <Store className="h-3 w-3 mr-1 text-siclo-blue" />
-                            <span className="truncate max-w-[120px]">{getBranchName(instructor.branchId)}</span>
-                          </div>
-                        </TableCell>
+ 
                         <TableCell>
                           {instructor.phone && (
                             <div className="flex items-center text-sm text-siclo-dark/70">
@@ -512,25 +499,7 @@ const InstructorManagement = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="branchId" className="text-siclo-dark font-medium flex items-center">
-                <Store className="h-4 w-4 mr-2" />
-                Sucursal *
-              </Label>
-              <Select onValueChange={(value) => setValue('branchId', value)}>
-                <SelectTrigger className="border-siclo-light focus:border-siclo-green focus:ring-siclo-green/20">
-                  <SelectValue placeholder="Selecciona una sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.filter(b => b.isActive).map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.branchId && <p className="text-sm text-red-600">Debes seleccionar una sucursal</p>}
-            </div>
+          
 
             <div className="flex gap-3 pt-4">
               <Button type="submit" className="flex-1 siclo-button">
@@ -566,10 +535,7 @@ const InstructorManagement = () => {
             <div className="space-y-4">
               <div className="bg-siclo-light/30 p-4 rounded-lg">
                 <div className="font-medium text-siclo-dark text-lg">{selectedInstructor.name}</div>
-                <div className="text-sm text-siclo-dark/70 flex items-center mt-1">
-                  <Store className="h-3 w-3 mr-1" />
-                  {getBranchName(selectedInstructor.branchId)}
-                </div>
+ 
                 <div className="mt-2">
                   <Badge className={`${getDisciplineColor(selectedInstructor.discipline)} border text-xs`}>
                     {getDisciplineText(selectedInstructor.discipline)}
