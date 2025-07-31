@@ -11,14 +11,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
-import { Star, Calendar as CalendarIcon, Clock, User, Building2, CheckCircle, Home, Mail } from 'lucide-react';
+import { Star, Calendar as CalendarIcon, Clock, User, Building2, CheckCircle, Home, Mail, ChevronDown, Search, Filter } from 'lucide-react';
 import { useBranchesStore } from '@/stores/branchesStore';
 import { useInstructorsStore } from '@/stores/instructorsStore';
 import { useRatingsStore } from '@/stores/ratingsStore';
 import { useEmailStore } from '@/stores/emailStore';
-import { Discipline, type CreateRatingDto } from '@/types/api';
+import { Discipline, type CreateRatingDto, type Instructor } from '@/types/api';
 import TimePicker from './TimePicker';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -198,6 +200,184 @@ const RatingForm = () => {
     );
   };
 
+  // Componente para seleccionar instructor con popover
+  const InstructorSelector = ({ 
+    instructors, 
+    selectedInstructorId, 
+    onInstructorSelect, 
+    hasError 
+  }: { 
+    instructors: Instructor[]; 
+    selectedInstructorId: string; 
+    onInstructorSelect: (instructorId: string) => void; 
+    hasError?: boolean;
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [selectedDiscipline, setSelectedDiscipline] = useState<Discipline | 'ALL'>('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const selectedInstructor = instructors.find(i => i.id === selectedInstructorId);
+
+    // Filtrar instructores por disciplina y búsqueda
+    const filteredInstructors = instructors.filter(instructor => {
+      const matchesDiscipline = selectedDiscipline === 'ALL' || instructor.discipline === selectedDiscipline;
+      const matchesSearch = instructor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           instructor.discipline.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesDiscipline && matchesSearch;
+    });
+
+    // Agrupar instructores por disciplina
+    const instructorsByDiscipline = filteredInstructors.reduce((acc, instructor) => {
+      if (!acc[instructor.discipline]) {
+        acc[instructor.discipline] = [];
+      }
+      acc[instructor.discipline].push(instructor);
+      return acc;
+    }, {} as Record<Discipline, Instructor[]>);
+
+    const getDisciplineColor = (discipline: Discipline) => {
+      switch (discipline) {
+        case Discipline.SICLO: return 'bg-blue-100 text-blue-800 border-blue-200';
+        case Discipline.BARRE: return 'bg-purple-100 text-purple-800 border-purple-200';
+        case Discipline.EJERCITO: return 'bg-green-100 text-green-800 border-green-200';
+        case Discipline.YOGA: return 'bg-orange-100 text-orange-800 border-orange-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    };
+
+    const getDisciplineIcon = (discipline: Discipline) => {
+      switch (discipline) {
+        case Discipline.SICLO: return 'SICLO';
+        case Discipline.BARRE: return 'BARRE';
+        case Discipline.EJERCITO: return 'EJERCITO';
+        case Discipline.YOGA: return 'YOGA';
+        default: return '?';
+      }
+    };
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              "w-full justify-between border-border focus:border-border focus:ring-siclo-green/20 text-sm",
+              hasError && "border-red-300 focus:border-red-300 focus:ring-red-200",
+              !selectedInstructor && "text-slate-500"
+            )}
+          >
+            {selectedInstructor ? (
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{getDisciplineIcon(selectedInstructor.discipline)}</span>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-slate-800">{selectedInstructor.name}</span>
+                  <Badge variant="outline" className={cn("text-xs", getDisciplineColor(selectedInstructor.discipline))}>
+                    {selectedInstructor.discipline}
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              "Selecciona el instructor"
+            )}
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+              <PopoverContent className="w-[calc(100vw-2rem)] max-w-[370px] p-0" align="start">
+        <div className="flex flex-col">
+          <div className="flex items-center border-b px-2 py-1">
+            <Search className="mr-2 h-3 w-3 shrink-0 opacity-50" />
+            <input
+              type="text"
+              placeholder="Buscar instructor..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 border-0 focus:ring-0 h-8 text-sm bg-transparent outline-none"
+            />
+          </div>
+          
+          {/* Filtros por disciplina */}
+          <div className="flex flex-col gap-2 p-2 border-b">
+            <div className="flex items-center gap-2">
+              <Filter className="h-3 w-3 text-slate-500" />
+              <span className="text-xs font-medium text-slate-700">Disciplina:</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <Badge
+                variant={selectedDiscipline === 'ALL' ? 'default' : 'outline'}
+                className={cn(
+                  "cursor-pointer text-xs px-2 py-1",
+                  selectedDiscipline === 'ALL' ? 'bg-siclo-green text-white' : 'hover:bg-slate-100'
+                )}
+                onClick={() => setSelectedDiscipline('ALL')}
+              >
+                Todas
+              </Badge>
+              {Object.values(Discipline).map((discipline) => (
+                <Badge
+                  key={discipline}
+                  variant={selectedDiscipline === discipline ? 'default' : 'outline'}
+                  className={cn(
+                    "cursor-pointer text-xs px-2 py-1",
+                    selectedDiscipline === discipline ? getDisciplineColor(discipline) : 'hover:bg-slate-100'
+                  )}
+                  onClick={() => setSelectedDiscipline(discipline)}
+                >
+                  {getDisciplineIcon(discipline)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-[250px] overflow-y-auto">
+            {filteredInstructors.length === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center text-xs">
+                  <div className="text-slate-500">
+                    {searchQuery ? 'No se encontraron instructores.' : 'No hay instructores disponibles.'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              Object.entries(instructorsByDiscipline).map(([discipline, disciplineInstructors]) => (
+                <div key={discipline} className="border-b last:border-b-0">
+                  <div className="px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50">
+                    {discipline}
+                  </div>
+                  {disciplineInstructors.map((instructor) => (
+                    <div
+                      key={instructor.id}
+                      onClick={() => {
+                        onInstructorSelect(instructor.id);
+                        setOpen(false);
+                        setSearchQuery('');
+                      }}
+                      className="flex items-center gap-2 p-2 cursor-pointer hover:bg-slate-50 border-b last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium text-slate-800 text-sm truncate">{instructor.name}</span>
+                          {instructor.email && (
+                            <span className="text-xs text-slate-500 truncate">{instructor.email}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn("text-xs px-1 py-0.5 shrink-0", getDisciplineColor(instructor.discipline))}>
+                        {instructor.discipline}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+      </Popover>
+    );
+  };
+
   if (submitted) {
     return (
       <Card className="border-emerald-200 bg-emerald-50/50 shadow-sm">
@@ -301,31 +481,12 @@ const RatingForm = () => {
             <User className="h-4 w-4 mr-2 text-siclo-blue" />
             Instructor *
           </Label>
-          <Select 
-            onValueChange={(value) => setValue('instructorId', value)}
-            value={watchedInstructor}
-          >
-            <SelectTrigger className="border-border focus:border-border focus:ring-siclo-green/20 text-sm">
-              <SelectValue placeholder="Selecciona el instructor" />
-            </SelectTrigger>
-            <SelectContent>
-              {instructors.length > 0 ? (
-                instructors.map((instructor) => (
-                  <SelectItem key={instructor.id} value={instructor.id}>
-                    <span className="font-medium text-slate-800">
-                      {instructor.name} - {instructor.discipline.toUpperCase()}
-                    </span>
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="no-instructors" disabled>
-                  <span className="text-slate-500">
-                    No hay instructores disponibles
-                  </span>
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          <InstructorSelector
+            instructors={instructors}
+            selectedInstructorId={watchedInstructor}
+            onInstructorSelect={(instructorId) => setValue('instructorId', instructorId)}
+            hasError={!!errors.instructorId}
+          />
           {errors.instructorId && <p className="text-xs sm:text-sm text-red-600 font-medium">{errors.instructorId.message}</p>}
         </div>
       </div>
