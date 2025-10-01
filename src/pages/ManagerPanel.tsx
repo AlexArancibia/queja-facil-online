@@ -344,7 +344,7 @@ const ManagerPanel = () => {
           );
 
           // Obtener metadata del branch y managers
-          const metadata = getBranchEmailMetadataSync(
+          const metadata = await getBranchEmailMetadataSync(
             selectedComplaint.branchId, 
             'status_update', 
             selectedComplaint.id

@@ -108,7 +108,7 @@ const ComplaintForm = () => {
         const emailHtml = generateComplaintConfirmationEmail(createdComplaint, branchName);
         
         // Obtener metadata del branch y managers
-        const metadata = getBranchEmailMetadataSync(data.branchId, 'complaint', createdComplaint.id);
+        const metadata = await getBranchEmailMetadataSync(data.branchId, 'complaint', createdComplaint.id);
         
         await sendEmail({
           to: data.email,

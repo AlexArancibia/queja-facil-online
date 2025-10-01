@@ -46,7 +46,17 @@ export const getBranchEmailMetadata = async (
     let managers: Array<{ id: string; name: string; email: string }> = [];
     try {
       // Obtener todos los usuarios del sistema si están disponibles
-      const allUsers = authStore.users || [];
+      let allUsers = authStore.users || [];
+      
+      // Si no hay usuarios cargados, intentar cargarlos
+      if (allUsers.length === 0) {
+        try {
+          await authStore.getAllUsers();
+          allUsers = authStore.users || [];
+        } catch (error) {
+          console.warn('Error cargando usuarios:', error);
+        }
+      }
       
       // Filtrar managers que pertenezcan a este branch
       const branchManagers = allUsers.filter(user => 
@@ -88,13 +98,6 @@ export const getBranchEmailMetadata = async (
       entityId
     };
 
-    console.log('📧 Metadata generada para email:', {
-      branchId,
-      branchName,
-      managersCount: managers.length,
-      type,
-      entityId
-    });
 
     return metadata;
   } catch (error) {
@@ -114,11 +117,11 @@ export const getBranchEmailMetadata = async (
 /**
  * Obtiene metadata de forma síncrona usando solo datos del store local
  */
-export const getBranchEmailMetadataSync = (
+export const getBranchEmailMetadataSync = async (
   branchId: string,
   type: 'complaint' | 'rating' | 'status_update',
   entityId?: string
-): EmailMetadata => {
+): Promise<EmailMetadata> => {
   const branchesStore = useBranchesStore.getState();
   const authStore = useAuthStore.getState();
   
@@ -127,7 +130,18 @@ export const getBranchEmailMetadataSync = (
   const branchName = localBranch?.name || 'Local';
   
   // Obtener managers del branch
-  const allUsers = authStore.users || [];
+  let allUsers = authStore.users || [];
+  
+  // Si no hay usuarios cargados, intentar cargarlos
+  if (allUsers.length === 0) {
+    try {
+      await authStore.getAllUsers();
+      allUsers = authStore.users || [];
+    } catch (error) {
+      console.warn('Error cargando usuarios:', error);
+    }
+  }
+  
   const branchManagers = allUsers.filter(user => 
     user.role === UserRole.MANAGER && 
     user.branches && 
@@ -148,13 +162,6 @@ export const getBranchEmailMetadataSync = (
     entityId
   };
 
-  console.log('📧 Metadata síncrona generada para email:', {
-    branchId,
-    branchName,
-    managersCount: managers.length,
-    type,
-    entityId
-  });
 
   return metadata;
 }; 
