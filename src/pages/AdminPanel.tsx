@@ -5,6 +5,9 @@ import { useComplaintsStore } from '@/stores/complaintsStore';
 import { useRatingsStore } from '@/stores/ratingsStore';
 import { useBranchesStore } from '@/stores/branchesStore';
 import { useInstructorsStore } from '@/stores/instructorsStore';
+import { useAreasStore } from '@/stores/areasStore';
+import { useEmailStore } from '@/stores/emailStore';
+import { useImageUpload } from '@/hooks/use-image-upload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +21,7 @@ import {
   type Rating, 
   type Branch, 
   type Instructor,
+  type Attachment,
   ComplaintStatus,
   ComplaintPriority,
   Discipline,
@@ -32,6 +36,7 @@ import { DateRangeFilter } from '@/components/DateRangeFilter';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmailMetadataDebug from '@/components/EmailMetadataDebug';
 import AnalyticsPanel from '@/components/AnalyticsPanel';
+import AreaManagement from '@/components/AreaManagement';
 import { 
   Pagination,
   PaginationContent,
@@ -67,7 +72,8 @@ import {
   Trash2,
   Eye,
   MoreHorizontal,
-  UserPlus
+  UserPlus,
+  Upload
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import EditUserModal from '@/components/EditUserModal';
@@ -75,13 +81,16 @@ import AttachmentsViewer from '@/components/AttachmentsViewer';
 import DateRangeFilterAdvanced from '@/components/DateRangeFilterAdvanced';
 import { ComplaintStatsCards } from '@/components/ComplaintStatsCards';
 import { RatingStatsCards } from '@/components/RatingStatsCards';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { generateComplaintStatusUpdateEmail } from '@/lib/emailTemplates';
+import { emailConfig } from '@/lib/envConfig';
 
 // Create a proper combined type for unified activity view
 type ComplaintActivity = Complaint & { type: 'complaint'; activityDate: Date };
@@ -103,6 +112,7 @@ const AdminPanel = () => {
     fetchComplaints, 
     getComplaintStats,
     deleteComplaint,
+    updateComplaint,
     pagination: complaintsPagination
   } = useComplaintsStore();
   
@@ -127,10 +137,36 @@ const AdminPanel = () => {
     fetchInstructors 
   } = useInstructorsStore();
 
+  const { 
+    areas, 
+    loading: areasLoading, 
+    fetchAreas 
+  } = useAreasStore();
+
+  const { sendEmail } = useEmailStore();
+
+  // Hook de subida de imágenes
+  const {
+    uploadMultipleImages,
+    isUploading,
+    uploadProgress
+  } = useImageUpload({
+    maxFileSize: 10, // MB
+    allowedTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    onError: (error) => {
+      toast({
+        title: "Error al subir imagen",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Local state
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterBranch, setFilterBranch] = useState('all');
+  const [filterArea, setFilterArea] = useState('all');
   const [filterInstructor, setFilterInstructor] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -152,9 +188,18 @@ const AdminPanel = () => {
   // Estado para acciones de tabla
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
 
+  // Estados para resolución de quejas
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [newStatus, setNewStatus] = useState<ComplaintStatus>();
+  const [resolution, setResolution] = useState('');
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [resolutionFiles, setResolutionFiles] = useState<File[]>([]);
+  const [resolutionPreviews, setResolutionPreviews] = useState<string[]>([]);
+  const [isUpdatingComplaint, setIsUpdatingComplaint] = useState(false);
+
   useEffect(() => {
     console.log('🔍 AdminPanel useEffect - user:', user);
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPERVISOR')) {
       console.log('❌ Usuario no autorizado, redirigiendo a login');
       navigate('/login');
       return;
@@ -166,15 +211,23 @@ const AdminPanel = () => {
   // Escuchar cambios en los search params para actualizar el tab activo
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['complaints', 'ratings', 'managers', 'instructors', 'stores', 'analytics'].includes(tab)) {
+    const allowedTabs = user?.role === 'ADMIN' 
+      ? ['complaints', 'ratings', 'managers', 'instructors', 'stores', 'areas', 'analytics']
+      : ['complaints', 'ratings', 'analytics']; // Supervisores solo pueden ver estas pestañas
+    
+    if (tab && allowedTabs.includes(tab)) {
       setActiveTab(tab);
+    } else if (tab && !allowedTabs.includes(tab)) {
+      // Si el supervisor intenta acceder a una pestaña no permitida, redirigir a complaints
+      setActiveTab('complaints');
+      navigate('/admin?tab=complaints', { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, user?.role, navigate]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, filterPriority, filterBranch, filterInstructor, filterType, startDate, endDate]);
+  }, [filterStatus, filterPriority, filterBranch, filterArea, filterInstructor, filterType, startDate, endDate]);
 
   // Fetch data when filters change (always start at page 1)
   useEffect(() => {
@@ -183,7 +236,7 @@ const AdminPanel = () => {
     } else if (activeTab === 'ratings') {
       fetchFilteredRatings(1);
     }
-  }, [filterStatus, filterPriority, filterBranch, filterInstructor, startDate, endDate, activeTab]);
+  }, [filterStatus, filterPriority, filterBranch, filterArea, filterInstructor, startDate, endDate, activeTab]);
 
   const loadData = async () => {
     console.log('🚀 Iniciando carga de datos para admin...');
@@ -193,6 +246,7 @@ const AdminPanel = () => {
       await Promise.all([
         fetchBranches(), // Get all branches
         fetchInstructors(), // Get all instructors
+        fetchAreas(), // Get all areas
         getAllUsers(), // Get all users
         fetchComplaints({
           page: 1,
@@ -225,8 +279,17 @@ const AdminPanel = () => {
 
   // Handle tab changes with URL navigation
   const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
-    navigate(`/admin?tab=${newTab}`);
+    const allowedTabs = user?.role === 'ADMIN' 
+      ? ['complaints', 'ratings', 'managers', 'instructors', 'stores', 'areas', 'analytics']
+      : ['complaints', 'ratings', 'analytics']; // Supervisores solo pueden ver estas pestañas
+    
+    if (allowedTabs.includes(newTab)) {
+      setActiveTab(newTab);
+      navigate(`/admin?tab=${newTab}`);
+    } else {
+      // Si el supervisor intenta acceder a una pestaña no permitida, no hacer nada
+      console.log('Acceso denegado a la pestaña:', newTab);
+    }
   };
 
   const getStatusColor = (status: ComplaintStatus) => {
@@ -410,6 +473,114 @@ const AdminPanel = () => {
     }
   };
 
+  // Funciones para resolución de quejas
+  const handleUpdateComplaintStatus = (complaint: Complaint) => {
+    setSelectedComplaint(complaint);
+    setNewStatus(complaint.status); // Preseleccionar el estado actual
+    
+    // Cargar datos existentes
+    setResolution(complaint.resolution || '');
+    
+    // Cargar archivos de resolución existentes
+    if (complaint.resolutionAttachments && complaint.resolutionAttachments.length > 0) {
+      // Crear URLs de preview para los archivos existentes
+      const existingPreviews = complaint.resolutionAttachments.map(attachment => attachment.url);
+      setResolutionPreviews(existingPreviews);
+      // No podemos cargar los archivos reales, pero mantenemos las URLs para mostrar
+      setResolutionFiles([]);
+    } else {
+      setResolutionFiles([]);
+      setResolutionPreviews([]);
+    }
+    
+    setIsStatusDialogOpen(true);
+  };
+
+  const handleResolutionFilesChange = (files: File[]) => {
+    setResolutionFiles(files);
+    
+    // Combinar archivos existentes con los nuevos
+    const existingPreviews = selectedComplaint?.resolutionAttachments?.map(attachment => attachment.url) || [];
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setResolutionPreviews([...existingPreviews, ...newPreviews]);
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedComplaint || !newStatus) return;
+
+    const oldStatus = selectedComplaint.status;
+
+    try {
+      setIsUpdatingComplaint(true);
+      let uploadedAttachments: Attachment[] = [];
+      if (resolutionFiles.length > 0) {
+        // Subir imágenes usando el hook useImageUpload
+        const uploadResults = await uploadMultipleImages(resolutionFiles);
+        uploadedAttachments = uploadResults
+          .filter(r => r.success && r.fileUrl)
+          .map((r, idx) => ({
+            filename: resolutionFiles[idx].name,
+            url: r.fileUrl!
+          }));
+      }
+      const updatedComplaint = await updateComplaint(selectedComplaint.id, {
+        status: newStatus,
+        resolution: resolution || undefined,
+        managerComments: resolution || undefined,
+        resolutionAttachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+      });
+
+      // Enviar email de notificación si el estado cambió
+      if (oldStatus !== newStatus) {
+        try {
+          const branch = branches.find(b => b.id === selectedComplaint.branchId);
+          if (branch) {
+            const emailHtml = generateComplaintStatusUpdateEmail(
+              updatedComplaint,
+              branch.name,
+              oldStatus,
+              newStatus,
+              resolution
+            );
+
+            await sendEmail({
+              to: selectedComplaint.email,
+              subject: `📋 Actualización de Sugerencia - ID: ${selectedComplaint.id}`,
+              html: emailHtml,
+            });
+          }
+        } catch (emailError) {
+          console.error('Error enviando email:', emailError);
+          // No mostrar error al usuario, solo log
+        }
+      }
+
+      toast({
+        title: "Estado actualizado",
+        description: `La sugerencia ha sido marcada como ${getStatusText(newStatus)}`,
+      });
+
+      // Cerrar dialog y limpiar estado
+      setIsStatusDialogOpen(false);
+      setSelectedComplaint(null);
+      setNewStatus(undefined);
+      setResolution('');
+      setResolutionFiles([]);
+      setResolutionPreviews([]);
+
+      // Recargar datos
+      await fetchFilteredComplaints(currentPage);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Error al actualizar el estado de la sugerencia",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingComplaint(false);
+    }
+  };
+
     // Helper function to format dates for API
   const formatDateForAPI = (date: Date | undefined): string | undefined => {
     if (!date) return undefined;
@@ -422,6 +593,7 @@ const AdminPanel = () => {
       status: filterStatus !== 'all' ? filterStatus : undefined,
       priority: filterPriority !== 'all' ? filterPriority : undefined,
       branchId: filterBranch !== 'all' ? filterBranch : undefined,
+      areaId: filterArea !== 'all' ? filterArea : undefined,
       startDate: formatDateForAPI(startDate),
       endDate: formatDateForAPI(endDate),
     });
@@ -432,6 +604,7 @@ const AdminPanel = () => {
         status: filterStatus !== 'all' ? (filterStatus as ComplaintStatus) : undefined,
         priority: filterPriority !== 'all' ? (filterPriority as ComplaintPriority) : undefined,
         branchId: filterBranch !== 'all' ? filterBranch : undefined,
+        areaId: filterArea !== 'all' ? filterArea : undefined,
         startDate: formatDateForAPI(startDate),
         endDate: formatDateForAPI(endDate),
       });
@@ -602,7 +775,7 @@ const AdminPanel = () => {
  
       <div className="container  mx-auto px-4 sm:px-6 lg:px-16 pt-0 pb-8 md:py-8">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 ">
-          <TabsList className="  w-full grid-cols-6 bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14 hidden md:grid">
+          <TabsList className={`w-full ${user?.role === 'ADMIN' ? 'grid-cols-7' : 'grid-cols-3'} bg-white/80 backdrop-blur-sm shadow-lg border border-siclo-light/50 h-14 hidden md:grid`}>
             <TabsTrigger value="complaints" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <MessageSquareText className="h-4 w-4 mr-2" />
               Sugerencias
@@ -611,18 +784,26 @@ const AdminPanel = () => {
               <Star className="h-4 w-4 mr-2" />
               Calificaciones
             </TabsTrigger>
-            <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <Users className="h-4 w-4 mr-2" />
-              Personal
-            </TabsTrigger>
-            <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <GraduationCap className="h-4 w-4 mr-2" />
-              Instructores
-            </TabsTrigger>
-            <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
-              <Building2 className="h-4 w-4 mr-2" />
-              Locales
-            </TabsTrigger>
+            {user?.role === 'ADMIN' && (
+              <>
+                <TabsTrigger value="managers" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+                  <Users className="h-4 w-4 mr-2" />
+                  Personal
+                </TabsTrigger>
+                <TabsTrigger value="instructors" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+                  <GraduationCap className="h-4 w-4 mr-2" />
+                  Instructores
+                </TabsTrigger>
+                <TabsTrigger value="stores" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Locales
+                </TabsTrigger>
+                <TabsTrigger value="areas" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Áreas
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="analytics" className="data-[state=active]:bg-siclo-green data-[state=active]:text-white font-medium">
               <PieChart className="h-4 w-4 mr-2" />
               Analíticas
@@ -685,6 +866,24 @@ const AdminPanel = () => {
           </Select>
       </div>
 
+                  {/* Área */}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+          <Select value={filterArea} onValueChange={setFilterArea}>
+                      <SelectTrigger className="border-0 bg-transparent h-auto p-0 focus:ring-0 shadow-none text-sm min-w-[120px]">
+                        <SelectValue placeholder="Área" />
+            </SelectTrigger>
+            <SelectContent>
+                        <SelectItem value="all">Todas las áreas</SelectItem>
+              {areas.filter(area => area.isActive).map((area) => (
+                <SelectItem key={area.id} value={area.id}>
+                  {area.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+      </div>
+
                   {/* Rango de Fechas Avanzado */}
                   <DateRangeFilterAdvanced
                     startDate={startDate}
@@ -694,7 +893,7 @@ const AdminPanel = () => {
                   />
 
                                     {/* Reset filters button */}
-                  {(filterStatus !== 'all' || filterPriority !== 'all' || filterBranch !== 'all' || startDate || endDate) && (
+                  {(filterStatus !== 'all' || filterPriority !== 'all' || filterBranch !== 'all' || filterArea !== 'all' || startDate || endDate) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -702,6 +901,7 @@ const AdminPanel = () => {
                         setFilterStatus('all');
                         setFilterPriority('all');
                         setFilterBranch('all');
+                        setFilterArea('all');
                         setStartDate(undefined);
                         setEndDate(undefined);
                       }}
@@ -781,6 +981,10 @@ const AdminPanel = () => {
                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewDetail(item, 'complaint'); }}>
                                       <Eye className="mr-2 h-4 w-4" />
                                       Ver detalle
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleUpdateComplaintStatus(item); }}>
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Actualizar Estado
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
                                       onClick={(e) => { e.stopPropagation(); handleDeleteComplaint(item.id); }}
@@ -904,6 +1108,10 @@ const AdminPanel = () => {
                                       <DropdownMenuItem onClick={() => handleViewDetail(item, 'complaint')}>
                                         <Eye className="mr-2 h-4 w-4" />
                                         Ver detalle
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleUpdateComplaintStatus(item)}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Actualizar Estado
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
                                         onClick={() => handleDeleteComplaint(item.id)}
@@ -1181,13 +1389,69 @@ const AdminPanel = () => {
                   </div>
                 )}
 
-
+                {/* Paginación para calificaciones */}
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (ratingsCurrentPage > 1) handleRatingsPageChange(ratingsCurrentPage - 1);
+                          }}
+                          className={ratingsCurrentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(ratingsTotalPages, 5) }, (_, i) => {
+                        let page;
+                        if (ratingsTotalPages <= 5) {
+                          page = i + 1;
+                        } else {
+                          const start = Math.max(1, ratingsCurrentPage - 2);
+                          page = start + i;
+                        }
+                        
+                        if (page <= ratingsTotalPages) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleRatingsPageChange(page);
+                                }}
+                                isActive={ratingsCurrentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (ratingsCurrentPage < ratingsTotalPages) handleRatingsPageChange(ratingsCurrentPage + 1);
+                          }}
+                          className={ratingsCurrentPage >= ratingsTotalPages ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
            
 
-          <TabsContent value="managers" className="space-y-6">
+          {user?.role === 'ADMIN' && (
+            <TabsContent value="managers" className="space-y-6">
             {/* Header optimizado para móvil y desktop */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/60 backdrop-blur-sm p-4 rounded-lg border border-siclo-light/30">
               <div>
@@ -1466,14 +1730,25 @@ const AdminPanel = () => {
               </DialogContent>
             </Dialog>
           </TabsContent>
+          )}
 
-          <TabsContent value="instructors" className="space-y-6">
-            <InstructorManagement />
-          </TabsContent>
+          {user?.role === 'ADMIN' && (
+            <TabsContent value="instructors" className="space-y-6">
+              <InstructorManagement />
+            </TabsContent>
+          )}
 
-          <TabsContent value="stores" className="space-y-6">
-            <StoreManagement />
-          </TabsContent>
+          {user?.role === 'ADMIN' && (
+            <TabsContent value="stores" className="space-y-6">
+              <StoreManagement />
+            </TabsContent>
+          )}
+
+          {user?.role === 'ADMIN' && (
+            <TabsContent value="areas" className="space-y-6">
+              <AreaManagement />
+            </TabsContent>
+          )}
 
           <TabsContent value="analytics" className="space-y-6">
             <AnalyticsPanel />
@@ -1679,6 +1954,212 @@ const AdminPanel = () => {
                   )}
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para actualizar estado de queja */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-siclo-dark text-xl font-semibold">
+              Actualizar Estado de Sugerencia
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Cambia el estado y agrega comentarios o archivos adjuntos para la resolución
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedComplaint && (
+            <div className="space-y-6 relative">
+              {isUpdatingComplaint && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl transition-all">
+                  <div className="flex flex-col items-center gap-4">
+                    <LoadingSpinner size="lg" />
+                    <p className="text-gray-600 font-medium">Actualizando estado...</p>
+                  </div>
+                </div>
+              )}
+              {/* Información de la queja */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-siclo-dark mb-2">Información de la Sugerencia</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Cliente:</span>
+                    <span className="ml-2 text-gray-900">{selectedComplaint.fullName}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Email:</span>
+                    <span className="ml-2 text-gray-900">{selectedComplaint.email}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Sucursal:</span>
+                    <span className="ml-2 text-gray-900">{getBranchName(selectedComplaint.branchId)}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Estado actual:</span>
+                    <Badge className={`ml-2 ${getStatusColor(selectedComplaint.status)}`}>
+                      {getStatusText(selectedComplaint.status)}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="font-medium text-gray-700">Detalle:</span>
+                  <p className="mt-1 text-gray-900 text-sm">{selectedComplaint.detail}</p>
+                </div>
+              </div>
+
+              {/* Selector de nuevo estado */}
+              <div>
+                <Label className="text-gray-700 text-sm font-medium mb-2 block">Nuevo Estado *</Label>
+                <Select value={newStatus} onValueChange={(value: ComplaintStatus) => setNewStatus(value)}>
+                  <SelectTrigger className="border-gray-300 focus:border-siclo-green focus:ring-siclo-green/20">
+                    <SelectValue placeholder="Selecciona el nuevo estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ComplaintStatus.PENDING}>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2 text-amber-500" />
+                        Pendiente
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={ComplaintStatus.IN_PROGRESS}>
+                      <div className="flex items-center">
+                        <Activity className="h-4 w-4 mr-2 text-blue-500" />
+                        En Proceso
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={ComplaintStatus.RESOLVED}>
+                      <div className="flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                        Resuelta
+                      </div>
+                    </SelectItem>
+                    <SelectItem value={ComplaintStatus.REJECTED}>
+                      <div className="flex items-center">
+                        <XCircle className="h-4 w-4 mr-2 text-red-500" />
+                        Rechazada
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Archivos adjuntos de resolución */}
+              <div>
+                <Label className="text-gray-700 text-sm font-medium mb-2 block">Archivos de Resolución</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      handleResolutionFilesChange(files);
+                    }}
+                    className="hidden"
+                    id="resolution-files"
+                  />
+                  <label
+                    htmlFor="resolution-files"
+                    className="cursor-pointer flex flex-col items-center justify-center py-4"
+                  >
+                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                    <span className="text-sm text-gray-600">
+                      Haz clic para subir archivos de resolución
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      JPG, PNG, WEBP, GIF (máx. 10MB cada uno)
+                    </span>
+                  </label>
+                </div>
+                
+                {/* Previews de archivos */}
+                {resolutionPreviews.length > 0 && (
+                  <div className="mt-3">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Archivos de resolución:</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {resolutionPreviews.map((preview, index) => {
+                        // Determinar si es un archivo existente o nuevo
+                        const isExistingFile = selectedComplaint?.resolutionAttachments && 
+                          index < selectedComplaint.resolutionAttachments.length;
+                        
+                        return (
+                          <div key={index} className="relative">
+                            <img
+                              src={preview}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-20 object-cover rounded border"
+                            />
+                            {isExistingFile ? (
+                              <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                                <span className="text-xs">✓</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  const newFiles = resolutionFiles.filter((_, i) => i !== (index - (selectedComplaint?.resolutionAttachments?.length || 0)));
+                                  const newPreviews = resolutionPreviews.filter((_, i) => i !== index);
+                                  setResolutionFiles(newFiles);
+                                  setResolutionPreviews(newPreviews);
+                                }}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {selectedComplaint?.resolutionAttachments && selectedComplaint.resolutionAttachments.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Los archivos marcados con ✓ son archivos existentes que no se pueden eliminar desde aquí.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Textarea de resolución */}
+              <div>
+                <Label className="text-gray-700 text-sm font-medium mb-1 block">Comentario / Resolución</Label>
+                <Textarea
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value)}
+                  placeholder="Describe cómo se resolvió la queja o deja un comentario para el cliente..."
+                  className="min-h-20 border-gray-300 focus:border-siclo-green mt-1 w-full rounded-lg text-sm"
+                  rows={4}
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-2 justify-end">
+                <Button 
+                  onClick={handleStatusUpdate} 
+                  disabled={!newStatus || isUploading || isUpdatingComplaint}
+                  className="flex-1 siclo-button bg-siclo-green hover:bg-siclo-green/90 text-white font-semibold text-base py-3 rounded-lg flex items-center justify-center gap-2 shadow-md disabled:opacity-60"
+                >
+                  {(isUploading || isUpdatingComplaint) ? <LoadingSpinner size="sm" /> : <CheckCircle className="h-5 w-5" />}
+                  {isUploading ? 'Subiendo...' : isUpdatingComplaint ? 'Actualizando...' : 'Actualizar Estado'}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setIsStatusDialogOpen(false);
+                    setNewStatus(undefined);
+                    setResolution('');
+                    setResolutionFiles([]);
+                    setResolutionPreviews([]);
+                    setSelectedComplaint(null);
+                  }}
+                  disabled={isUploading || isUpdatingComplaint}
+                  className="rounded-lg border-gray-300 text-gray-600 bg-white hover:bg-gray-50 text-base"
+                >
+                  Cancelar
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

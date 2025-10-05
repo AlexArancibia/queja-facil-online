@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useComplaintsStore } from '@/stores/complaintsStore';
 import { useRatingsStore } from '@/stores/ratingsStore';
 import { useBranchesStore } from '@/stores/branchesStore';
+import { useAreasStore } from '@/stores/areasStore';
 import { useEmailStore } from '@/stores/emailStore';
 import { useImageUpload } from '@/hooks/use-image-upload';
 import { 
@@ -93,16 +94,18 @@ const ManagerPanel = () => {
     fetchComplaints, 
     updateComplaint,
     getComplaintStats,
-    // pagination, // Eliminado paginación
+    pagination: complaintsPagination,
     loading: complaintsLoading
   } = useComplaintsStore();
   const { 
     ratings, 
     fetchRatings,
     getRatingStats,
+    pagination: ratingsPagination,
     loading: ratingsLoading
   } = useRatingsStore();
   const { branches, fetchBranches, getBranchById } = useBranchesStore();
+  const { areas, fetchAreas } = useAreasStore();
   const { sendEmail } = useEmailStore();
 
   // State
@@ -114,6 +117,14 @@ const ManagerPanel = () => {
   const [filterPriority, setFilterPriority] = useState<ComplaintPriority | 'all'>('all');
   const [filterInstructor, setFilterInstructor] = useState<string>('all');
   const [managerBranch, setManagerBranch] = useState<Branch | null>(null);
+  
+  // Paginación
+  const itemsPerPage = 15;
+  const complaintsCurrentPage = complaintsPagination.page;
+  const complaintsTotalPages = complaintsPagination.totalPages || 1;
+  const ratingsCurrentPage = ratingsPagination.page;
+  const ratingsTotalPages = ratingsPagination.totalPages || 1;
+  
   const [activeTab, setActiveTab] = useState(() => {
     return searchParams.get('tab') || 'complaints';
   });
@@ -151,7 +162,12 @@ const ManagerPanel = () => {
   const managerBranchId = user?.branches?.[0]?.id;
 
   useEffect(() => {
-    if (!user || (user.role !== 'MANAGER' && user.role !== 'SUPERVISOR')) {
+    if (!user || user.role !== 'MANAGER') {
+      if (user?.role === 'SUPERVISOR') {
+        // Redirigir supervisores al panel de admin
+        navigate('/admin');
+        return;
+      }
       navigate('/login');
       return;
     }
@@ -186,7 +202,10 @@ const ManagerPanel = () => {
     setIsInitialLoading(true);
     try {
       if (managerBranchId) {
-        await fetchBranches();
+        await Promise.all([
+          fetchBranches(),
+          fetchAreas()
+        ]);
         const branch = await getBranchById(managerBranchId);
         setManagerBranch(branch);
         await fetchData();
@@ -202,17 +221,22 @@ const ManagerPanel = () => {
     }
   };
 
-  // fetchData simplificado (sin paginación)
+  // fetchData con paginación
   const fetchData = async () => {
     try {
       await Promise.all([
         fetchComplaints({ 
-          limit: 100,
+          page: 1,
+          limit: itemsPerPage,
           branchId: managerBranchId,
           status: filterStatus !== 'all' ? filterStatus : undefined,
           priority: filterPriority !== 'all' ? filterPriority : undefined
         }),
-        fetchRatings({ limit: 100, branchId: managerBranchId })
+        fetchRatings({ 
+          page: 1,
+          limit: itemsPerPage, 
+          branchId: managerBranchId 
+        })
       ]);
     } catch (error) {
       toast({
@@ -221,6 +245,25 @@ const ManagerPanel = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Pagination handlers
+  const handleComplaintsPageChange = (newPage: number) => {
+    fetchComplaints({
+      page: newPage,
+      limit: itemsPerPage,
+      branchId: managerBranchId,
+      status: filterStatus !== 'all' ? filterStatus : undefined,
+      priority: filterPriority !== 'all' ? filterPriority : undefined
+    });
+  };
+
+  const handleRatingsPageChange = (newPage: number) => {
+    fetchRatings({
+      page: newPage,
+      limit: itemsPerPage,
+      branchId: managerBranchId
+    });
   };
 
   const loadStats = async () => {
@@ -540,7 +583,7 @@ const ManagerPanel = () => {
                   Panel de Gestión - {managerBranch?.name || 'Sucursal'}
                 </h2>
                 <p className="text-sm text-siclo-dark/70 mt-1">
-                  Gestiona las quejas de tu sucursal ({filteredComplaints.length} elementos)
+                  Gestiona las quejas de tu sucursal ({complaintsPagination.total || filteredComplaints.length} elementos)
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -804,6 +847,63 @@ const ManagerPanel = () => {
                     )}
                   </div>
                 )}
+
+                {/* Paginación para quejas */}
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (complaintsCurrentPage > 1) handleComplaintsPageChange(complaintsCurrentPage - 1);
+                          }}
+                          className={complaintsCurrentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(complaintsTotalPages, 5) }, (_, i) => {
+                        let page;
+                        if (complaintsTotalPages <= 5) {
+                          page = i + 1;
+                        } else {
+                          const start = Math.max(1, complaintsCurrentPage - 2);
+                          page = start + i;
+                        }
+                        
+                        if (page <= complaintsTotalPages) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleComplaintsPageChange(page);
+                                }}
+                                isActive={complaintsCurrentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (complaintsCurrentPage < complaintsTotalPages) handleComplaintsPageChange(complaintsCurrentPage + 1);
+                          }}
+                          className={complaintsCurrentPage >= complaintsTotalPages ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -817,7 +917,7 @@ const ManagerPanel = () => {
                   Panel de Gestión - {managerBranch?.name || 'Sucursal'}
                 </h2>
                 <p className="text-sm text-siclo-dark/70 mt-1">
-                  Gestiona las calificaciones de tu sucursal ({filteredRatings.length} elementos)
+                  Gestiona las calificaciones de tu sucursal ({ratingsPagination.total || filteredRatings.length} elementos)
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1054,6 +1154,63 @@ const ManagerPanel = () => {
                     </p>
                   </div>
                 )}
+
+                {/* Paginación para calificaciones */}
+                <div className="mt-6 flex justify-center">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (ratingsCurrentPage > 1) handleRatingsPageChange(ratingsCurrentPage - 1);
+                          }}
+                          className={ratingsCurrentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(ratingsTotalPages, 5) }, (_, i) => {
+                        let page;
+                        if (ratingsTotalPages <= 5) {
+                          page = i + 1;
+                        } else {
+                          const start = Math.max(1, ratingsCurrentPage - 2);
+                          page = start + i;
+                        }
+                        
+                        if (page <= ratingsTotalPages) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleRatingsPageChange(page);
+                                }}
+                                isActive={ratingsCurrentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (ratingsCurrentPage < ratingsTotalPages) handleRatingsPageChange(ratingsCurrentPage + 1);
+                          }}
+                          className={ratingsCurrentPage >= ratingsTotalPages ? 'pointer-events-none opacity-50' : ''}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1510,11 +1667,11 @@ const ManagerPanel = () => {
                 <div className="flex gap-3 pt-2 justify-end">
                   <Button 
                     onClick={handleStatusUpdate} 
-                    disabled={!newStatus || isUploading}
+                    disabled={!newStatus || isUploading || isUpdatingComplaint}
                     className="flex-1 siclo-button bg-siclo-green hover:bg-siclo-green/90 text-white font-semibold text-base py-3 rounded-lg flex items-center justify-center gap-2 shadow-md disabled:opacity-60"
                   >
-                    {isUploading ? <LoadingSpinner size="sm" /> : <CheckCircle className="h-5 w-5" />}
-                    {isUploading ? 'Subiendo...' : 'Actualizar Estado'}
+                    {(isUploading || isUpdatingComplaint) ? <LoadingSpinner size="sm" /> : <CheckCircle className="h-5 w-5" />}
+                    {isUploading ? 'Subiendo...' : isUpdatingComplaint ? 'Actualizando...' : 'Actualizar Estado'}
                   </Button>
                   <Button 
                     variant="outline"
@@ -1525,7 +1682,7 @@ const ManagerPanel = () => {
                       setResolutionFiles([]);
                       setResolutionPreviews([]);
                     }}
-                    disabled={isUploading}
+                    disabled={isUploading || isUpdatingComplaint}
                     className="rounded-lg border-gray-300 text-gray-600 bg-white hover:bg-gray-50 text-base"
                   >
                     Cancelar

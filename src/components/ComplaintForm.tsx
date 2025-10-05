@@ -11,16 +11,18 @@ import { Send, CheckCircle } from 'lucide-react';
 import { ComplaintPriority, type CreateComplaintDto } from '@/types/api';
 import { useComplaintsStore } from '@/stores/complaintsStore';
 import { useBranchesStore } from '@/stores/branchesStore';
+import { useAreasStore } from '@/stores/areasStore';
 import { useEmailStore } from '@/stores/emailStore';
 import { ImageUploader } from '@/components/ImageUploader';
 import { generateComplaintConfirmationEmail } from '@/lib/emailTemplates';
 import { emailConfig } from '@/lib/envConfig';
-import { getBranchEmailMetadataSync } from '@/lib/emailHelpers';
+import { getBranchEmailMetadataSync, getGeneralComplaintEmailMetadata } from '@/lib/emailHelpers';
 
 interface ComplaintFormData {
   fullName: string;
   email: string;
   branchId: string;
+  areaId?: string;
   observationType: string;
   detail: string;
   priority: ComplaintPriority;
@@ -46,6 +48,7 @@ const ComplaintForm = () => {
   // Stores
   const { createComplaint } = useComplaintsStore();
   const { branches, fetchBranches, loading: branchesLoading } = useBranchesStore();
+  const { areas, fetchAreas, loading: areasLoading } = useAreasStore();
   const { sendEmail } = useEmailStore();
 
   const {
@@ -62,11 +65,23 @@ const ComplaintForm = () => {
   const selectedPriority = watch('priority');
 
   useEffect(() => {
-    // Fetch active branches when component mounts
-    if (!branches.length && !branchesLoading) {
-      fetchBranches(true);
-    }
-  }, [fetchBranches, branches, branchesLoading]);
+    // Fetch active branches and areas when component mounts
+    const loadData = async () => {
+      try {
+        // Only fetch if we don't have data and we're not already loading
+        if (branches.length === 0 && !branchesLoading) {
+          await fetchBranches(true);
+        }
+        if (areas.length === 0 && !areasLoading) {
+          await fetchAreas(true);
+        }
+      } catch (error) {
+        console.error('Error loading form data:', error);
+      }
+    };
+
+    loadData();
+  }, []); // Empty dependency array to run only once
 
   const handleImagesChange = (imageUrls: string[]) => {
     setUploadedImageUrls(imageUrls);
@@ -87,6 +102,7 @@ const ComplaintForm = () => {
         fullName: data.fullName,
         email: data.email,
         branchId: data.branchId,
+        areaId: data.areaId,
         observationType: data.observationType,
         detail: data.detail,
         priority: data.priority,
@@ -103,14 +119,37 @@ const ComplaintForm = () => {
       // Enviar email de confirmación
       try {
         const selectedBranchData = branches.find(b => b.id === data.branchId);
-        const branchName = selectedBranchData?.name || 'Local';
+        const branchName = selectedBranchData?.name || 'Todas las sucursales';
+        
+        console.log('📧 INICIANDO ENVÍO DE EMAIL DE CONFIRMACIÓN');
+        console.log('📋 Datos de la queja:', {
+          id: createdComplaint.id,
+          fullName: data.fullName,
+          email: data.email,
+          branchId: data.branchId,
+          branchName: branchName,
+          observationType: data.observationType,
+          priority: data.priority
+        });
         
         const emailHtml = generateComplaintConfirmationEmail(createdComplaint, branchName);
         
-        // Obtener metadata del branch y managers
-        const metadata = await getBranchEmailMetadataSync(data.branchId, 'complaint', createdComplaint.id);
+        // Obtener metadata según si hay sucursal o no
+        console.log('🔍 Obteniendo metadata de email...');
+        const metadata = data.branchId 
+          ? await getBranchEmailMetadataSync(data.branchId, 'complaint', createdComplaint.id)
+          : await getGeneralComplaintEmailMetadata('complaint', createdComplaint.id);
         
-        await sendEmail({
+        console.log('📊 Metadata obtenida:', {
+          branchId: metadata.branchId,
+          branchName: metadata.branchName,
+          type: metadata.type,
+          entityId: metadata.entityId,
+          managersCount: metadata.managers?.length || 0,
+          managers: metadata.managers?.map(m => ({ name: m.name, email: m.email })) || []
+        });
+        
+        const emailData = {
           to: data.email,
           subject: `✅ Sugerencia Registrada - ID: ${createdComplaint.id}`,
           html: emailHtml,
@@ -119,9 +158,23 @@ const ComplaintForm = () => {
             address: emailConfig.fromAddress
           },
           metadata
+        };
+        
+        console.log('📤 Enviando email con los siguientes datos:', {
+          to: emailData.to,
+          subject: emailData.subject,
+          from: emailData.from,
+          hasMetadata: !!emailData.metadata,
+          managersInMetadata: emailData.metadata?.managers?.length || 0
         });
+        
+        await sendEmail(emailData);
 
         console.log('✅ Email de confirmación enviado exitosamente');
+        console.log('📬 Destinatario principal:', data.email);
+        console.log('👥 Copias enviadas a:', metadata.managers?.map(m => `${m.name} (${m.email})`).join(', ') || 'Ninguna');
+        console.log('🏢 Sucursal:', branchName);
+        console.log('📝 Motivo: Confirmación de queja registrada');
       } catch (emailError) {
         console.error('❌ Error enviando email de confirmación:', emailError);
         // No mostramos error al usuario ya que la queja se registró exitosamente
@@ -240,18 +293,21 @@ const ComplaintForm = () => {
             </div>
           </div>
 
-          {/* Location and Type */}
+          {/* Local y Área */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-800">Local *</Label>
+              <Label className="text-sm font-medium text-slate-800">Local</Label>
               <Select 
-                onValueChange={(value) => setValue('branchId', value)}
-                value={selectedBranch}
+                onValueChange={(value) => setValue('branchId', value === 'all' ? undefined : value)}
+                value={selectedBranch || 'all'}
               >
                 <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
                   <SelectValue placeholder="Selecciona un local" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">
+                    <span className="font-medium text-slate-800">🌐 Todas las sucursales</span>
+                  </SelectItem>
                   {branchesLoading ? (
                     <SelectItem value="loading" disabled>
                       <span className="text-slate-500">Cargando locales...</span>
@@ -270,11 +326,42 @@ const ComplaintForm = () => {
                   )}
                 </SelectContent>
               </Select>
-              {hasAttemptedSubmit && !selectedBranch && (
-                <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar un local</p>
-              )}
             </div>
 
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-800">Área</Label>
+              <Select 
+                onValueChange={(value) => setValue('areaId', value === 'none' ? undefined : value)}
+                value={watch('areaId') || 'none'}
+              >
+                <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
+                  <SelectValue placeholder="Selecciona un área" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-slate-500">Sin área específica</span>
+                  </SelectItem>
+                  {areasLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <span className="text-slate-500">Cargando áreas...</span>
+                    </SelectItem>
+                  ) : (
+                    areas.filter(area => area.isActive).map((area) => (
+                      <SelectItem 
+                        key={area.id} 
+                        value={area.id}
+                      >
+                        <span className="font-medium text-slate-800">{area.name}</span>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Tipo de Observación y Prioridad */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-800">Tipo de Observación *</Label>
               <Select 
@@ -296,33 +383,32 @@ const ComplaintForm = () => {
                 <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar un tipo</p>
               )}
             </div>
-          </div>
 
-          {/* Priority */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-slate-800">Prioridad *</Label>
-            <Select 
-              onValueChange={(value) => setValue('priority', value as ComplaintPriority)}
-              value={selectedPriority}
-            >
-              <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
-                <SelectValue placeholder="Selecciona la prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ComplaintPriority.HIGH}>
-                  <span className="font-medium text-red-700">🔴 Alta</span>
-                </SelectItem>
-                <SelectItem value={ComplaintPriority.MEDIUM}>
-                  <span className="font-medium text-orange-700">🟡 Media</span>
-                </SelectItem>
-                <SelectItem value={ComplaintPriority.LOW}>
-                  <span className="font-medium text-green-700">🟢 Baja</span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {hasAttemptedSubmit && !selectedPriority && (
-              <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar una prioridad</p>
-            )}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-800">Prioridad *</Label>
+              <Select 
+                onValueChange={(value) => setValue('priority', value as ComplaintPriority)}
+                value={selectedPriority}
+              >
+                <SelectTrigger className="w-full border-slate-300 focus:border-siclo-green focus:ring-siclo-green/20 text-sm">
+                  <SelectValue placeholder="Selecciona la prioridad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ComplaintPriority.HIGH}>
+                    <span className="font-medium text-red-700">🔴 Alta</span>
+                  </SelectItem>
+                  <SelectItem value={ComplaintPriority.MEDIUM}>
+                    <span className="font-medium text-orange-700">🟡 Media</span>
+                  </SelectItem>
+                  <SelectItem value={ComplaintPriority.LOW}>
+                    <span className="font-medium text-green-700">🟢 Baja</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {hasAttemptedSubmit && !selectedPriority && (
+                <p className="text-xs sm:text-sm text-red-600 font-medium">Debes seleccionar una prioridad</p>
+              )}
+            </div>
           </div>
 
           {/* Detail */}
@@ -374,7 +460,7 @@ const ComplaintForm = () => {
             <Button 
               type="submit" 
               className="w-full siclo-button bg-gradient-to-r from-siclo-orange via-siclo-purple to-siclo-deep-blue text-base sm:text-lg py-4 sm:py-6 font-medium shadow-md hover:shadow-lg transition-shadow" 
-              disabled={isSubmitting || !selectedBranch || !selectedObservationType || !selectedPriority || branchesLoading}
+              disabled={isSubmitting || !selectedObservationType || !selectedPriority || branchesLoading}
             >
               {isSubmitting ? (
                 <span className="text-white/90">Enviando queja...</span>

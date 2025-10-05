@@ -39,6 +39,19 @@ export interface Attachment {
   url: string;
 }
 
+// Area interface
+export interface Area {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  _count?: {
+    complaints: number;
+  };
+}
+
 // API DTOs
 export interface User {
   id: string;
@@ -88,7 +101,8 @@ export interface Complaint {
   id: string;
   fullName: string;
   email: string;
-  branchId: string;
+  branchId?: string;
+  areaId?: string;
   observationType: string;
   detail: string;
   priority: ComplaintPriority;
@@ -100,6 +114,7 @@ export interface Complaint {
   createdAt: Date;
   updatedAt: Date;
   branch?: Branch;
+  area?: Area;
 }
 
 export interface Rating {
@@ -129,7 +144,8 @@ export interface Rating {
 export interface CreateComplaintDto {
   fullName: string;
   email: string;
-  branchId: string;
+  branchId?: string;
+  areaId?: string;
   observationType: string;
   detail: string;
   priority: ComplaintPriority;

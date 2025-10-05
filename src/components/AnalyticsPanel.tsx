@@ -93,12 +93,14 @@ const AnalyticsPanel = () => {
         const branchPromises = branches.map(async (branch) => {
           try {
             const ratings = await getBranchRatings(branch.id);
+            const avgRating = ratings.length > 0 
+              ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.npsScore) || 0), 0) / ratings.length 
+              : 0;
+            
             return {
               ...branch,
               ratingsCount: ratings.length,
-              avgRating: ratings.length > 0 
-                ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.npsScore) || 0), 0) / ratings.length 
-                : 0
+              avgRating
             };
           } catch (error) {
             return { ...branch, ratingsCount: 0, avgRating: 0 };
@@ -108,12 +110,14 @@ const AnalyticsPanel = () => {
         const instructorPromises = instructors.map(async (instructor) => {
           try {
             const ratings = await getInstructorRatings(instructor.id);
+            const avgRating = ratings.length > 0 
+              ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.instructorRating) || 0), 0) / ratings.length 
+              : 0;
+            
             return {
               ...instructor,
               ratingsCount: ratings.length,
-              avgRating: ratings.length > 0 
-                ? ratings.reduce((acc: number, r: any) => acc + (parseFloat(r.instructor) || 0), 0) / ratings.length 
-                : 0
+              avgRating
             };
           } catch (error) {
             return { ...instructor, ratingsCount: 0, avgRating: 0 };

@@ -258,8 +258,8 @@ const Navbar = () => {
                           </>
                         )}
 
-                        {/* Navegación específica para Manager y Supervisor */}
-                        {(user?.role === UserRole.MANAGER || user?.role === UserRole.SUPERVISOR) && (
+                        {/* Navegación específica para Manager */}
+                        {user?.role === UserRole.MANAGER && (
                           <>
                             <button
                               onClick={() => handleNavigation('/manager?tab=complaints')}
@@ -281,6 +281,33 @@ const Navbar = () => {
                             >
                               <BarChart3 className="h-5 w-5" />
                               <span className="text-sm">Estadísticas</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Navegación específica para Supervisor */}
+                        {user?.role === UserRole.SUPERVISOR && (
+                          <>
+                            <button
+                              onClick={() => handleNavigation('/admin?tab=complaints')}
+                              className={getMobileLinkClasses(location.pathname === '/admin' && isCurrentTab('complaints'))}
+                            >
+                              <MessageSquareText className="h-5 w-5" />
+                              <span className="text-sm">Sugerencias</span>
+                            </button>
+                            <button
+                              onClick={() => handleNavigation('/admin?tab=ratings')}
+                              className={getMobileLinkClasses(location.pathname === '/admin' && isCurrentTab('ratings'))}
+                            >
+                              <Star className="h-5 w-5" />
+                              <span className="text-sm">Calificaciones</span>
+                            </button>
+                            <button
+                              onClick={() => handleNavigation('/admin?tab=analytics')}
+                              className={getMobileLinkClasses(location.pathname === '/admin' && isCurrentTab('analytics'))}
+                            >
+                              <BarChart3 className="h-5 w-5" />
+                              <span className="text-sm">Analíticas</span>
                             </button>
                           </>
                         )}

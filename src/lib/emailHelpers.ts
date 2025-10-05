@@ -122,23 +122,29 @@ export const getBranchEmailMetadataSync = async (
   type: 'complaint' | 'rating' | 'status_update',
   entityId?: string
 ): Promise<EmailMetadata> => {
+  console.log('🔍 getBranchEmailMetadataSync - Iniciando para branchId:', branchId, 'type:', type);
+  
   const branchesStore = useBranchesStore.getState();
   const authStore = useAuthStore.getState();
   
   // Obtener nombre del branch
   const localBranch = branchesStore.branches.find(b => b.id === branchId);
   const branchName = localBranch?.name || 'Local';
+  console.log('🏢 Branch encontrado:', { id: branchId, name: branchName });
   
   // Obtener managers del branch
   let allUsers = authStore.users || [];
+  console.log('👥 Usuarios en store local:', allUsers.length);
   
   // Si no hay usuarios cargados, intentar cargarlos
   if (allUsers.length === 0) {
     try {
+      console.log('📥 Cargando usuarios desde API...');
       await authStore.getAllUsers();
       allUsers = authStore.users || [];
+      console.log('✅ Usuarios cargados:', allUsers.length);
     } catch (error) {
-      console.warn('Error cargando usuarios:', error);
+      console.warn('❌ Error cargando usuarios:', error);
     }
   }
   
@@ -147,6 +153,15 @@ export const getBranchEmailMetadataSync = async (
     user.branches && 
     user.branches.some(branch => branch.id === branchId)
   );
+
+  console.log('👨‍💼 Managers encontrados para branch:', branchManagers.length);
+  branchManagers.forEach(manager => {
+    console.log('  - Manager:', {
+      name: manager.name || `${manager.firstName || ''} ${manager.lastName || ''}`.trim(),
+      email: manager.email,
+      role: manager.role
+    });
+  });
 
   const managers = branchManagers.map(manager => ({
     id: manager.id,
@@ -162,6 +177,93 @@ export const getBranchEmailMetadataSync = async (
     entityId
   };
 
+  console.log('📊 Metadata final generada:', {
+    branchId: metadata.branchId,
+    branchName: metadata.branchName,
+    managersCount: metadata.managers.length,
+    type: metadata.type,
+    entityId: metadata.entityId
+  });
 
   return metadata;
+};
+
+/**
+ * Obtiene metadata para quejas sin sucursal (quejas generales)
+ * Incluye todos los supervisores y administradores del sistema
+ */
+export const getGeneralComplaintEmailMetadata = async (
+  type: 'complaint' | 'rating' | 'status_update',
+  entityId?: string
+): Promise<EmailMetadata> => {
+  console.log('🌐 getGeneralComplaintEmailMetadata - Iniciando para queja general, type:', type);
+  
+  try {
+    const authStore = useAuthStore.getState();
+    
+    // Obtener todos los usuarios del sistema
+    let allUsers = authStore.users || [];
+    console.log('👥 Usuarios en store local:', allUsers.length);
+    
+    // Si no hay usuarios cargados, intentar cargarlos
+    if (allUsers.length === 0) {
+      try {
+        console.log('📥 Cargando usuarios desde API...');
+        await authStore.getAllUsers();
+        allUsers = authStore.users || [];
+        console.log('✅ Usuarios cargados:', allUsers.length);
+      } catch (error) {
+        console.warn('❌ Error cargando usuarios:', error);
+      }
+    }
+    
+    // Filtrar supervisores y administradores
+    const supervisorsAndAdmins = allUsers.filter(user => 
+      user.role === UserRole.SUPERVISOR || user.role === UserRole.ADMIN
+    );
+
+    console.log('👨‍💼👩‍💼 Supervisores y Administradores encontrados:', supervisorsAndAdmins.length);
+    supervisorsAndAdmins.forEach(user => {
+      console.log('  - Usuario:', {
+        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.email,
+        role: user.role
+      });
+    });
+
+    const managers = supervisorsAndAdmins.map(user => ({
+      id: user.id,
+      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Usuario',
+      email: user.email
+    }));
+
+    const metadata: EmailMetadata = {
+      branchName: 'Todas las sucursales',
+      managers,
+      type,
+      entityId
+    };
+
+    console.log('📊 Metadata final para queja general:', {
+      branchName: metadata.branchName,
+      managersCount: metadata.managers.length,
+      type: metadata.type,
+      entityId: metadata.entityId
+    });
+
+    return metadata;
+  } catch (error) {
+    console.error('❌ Error generando metadata para queja general:', error);
+    
+    // Retornar metadata básica en caso de error
+    const fallbackMetadata = {
+      branchName: 'Todas las sucursales',
+      managers: [],
+      type,
+      entityId
+    };
+    
+    console.log('🔄 Usando metadata de fallback:', fallbackMetadata);
+    return fallbackMetadata;
+  }
 }; 

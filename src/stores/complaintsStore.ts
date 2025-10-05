@@ -26,6 +26,7 @@ interface ComplaintsState {
     page?: number;
     limit?: number;
     branchId?: string;
+    areaId?: string;
     status?: ComplaintStatus;
     priority?: ComplaintPriority;
     startDate?: string;
@@ -53,12 +54,13 @@ export const useComplaintsStore = create<ComplaintsState>((set, get) => ({
   fetchComplaints: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const { page = 1, limit = 10, branchId, status, priority, startDate, endDate } = params;
+      const { page = 1, limit = 10, branchId, areaId, status, priority, startDate, endDate } = params;
       
       const searchParams = new URLSearchParams();
       searchParams.append('page', page.toString());
       searchParams.append('limit', limit.toString());
       if (branchId) searchParams.append('branchId', branchId);
+      if (areaId) searchParams.append('areaId', areaId);
       if (status) searchParams.append('status', status);
       if (priority) searchParams.append('priority', priority);
       if (startDate) searchParams.append('startDate', startDate);

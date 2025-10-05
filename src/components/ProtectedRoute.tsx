@@ -46,10 +46,10 @@ const ProtectedRoute = ({
         // Redirigir según el rol del usuario
         switch (user.role) {
           case UserRole.ADMIN:
+          case UserRole.SUPERVISOR:
             navigate('/admin');
             break;
           case UserRole.MANAGER:
-          case UserRole.SUPERVISOR:
             navigate('/manager');
             break;
           default:

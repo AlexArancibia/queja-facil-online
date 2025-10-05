@@ -24,10 +24,39 @@ export const useEmailStore = create<EmailState>((set, get) => ({
   lastResponse: null,
 
   sendEmail: async (emailData: SendEmailDto) => {
+    console.log('📧 EMAIL STORE - Iniciando envío de email');
+    console.log('📤 Datos del email:', {
+      to: emailData.to,
+      subject: emailData.subject,
+      from: emailData.from,
+      hasHtml: !!emailData.html,
+      hasMetadata: !!emailData.metadata,
+      metadataType: emailData.metadata?.type,
+      metadataBranchId: emailData.metadata?.branchId,
+      metadataBranchName: emailData.metadata?.branchName,
+      metadataManagersCount: emailData.metadata?.managers?.length || 0
+    });
+    
+    if (emailData.metadata?.managers && emailData.metadata.managers.length > 0) {
+      console.log('👥 Copias (CC) que se enviarán:');
+      emailData.metadata.managers.forEach((manager, index) => {
+        console.log(`  ${index + 1}. ${manager.name} (${manager.email})`);
+      });
+    } else {
+      console.log('👥 No hay copias (CC) configuradas');
+    }
+    
     set({ loading: true, error: null });
     try {
+      console.log('🚀 Enviando request a /email/send...');
       const response = await apiClient.post<EmailResponse>('/email/send', emailData);
       const result = response.data;
+      
+      console.log('✅ EMAIL STORE - Respuesta del servidor:', {
+        success: result.success,
+        message: result.message,
+        hasError: !!result.error
+      });
       
       set({ 
         loading: false, 
@@ -37,6 +66,12 @@ export const useEmailStore = create<EmailState>((set, get) => ({
       
       return result;
     } catch (error: any) {
+      console.error('❌ EMAIL STORE - Error en envío:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
       const errorMessage = error.response?.data?.message || error.message || 'Error al enviar email';
       const errorResponse: EmailResponse = {
         success: false,

@@ -31,14 +31,14 @@ const Login = () => {
       console.log('Usuario ya autenticado, redirigiendo...', { role: user.role });
       switch(user.role) {
         case UserRole.ADMIN:
+        case UserRole.SUPERVISOR:
           navigate('/admin');
           break;
         case UserRole.MANAGER:
-        case UserRole.SUPERVISOR:
           navigate('/manager');
           break;
         default:
-          navigate('/dashboard');
+          navigate('/');
       }
     }
   }, [isAuthenticated, user, authLoading, navigate]);
